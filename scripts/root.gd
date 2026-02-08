@@ -45,6 +45,8 @@ const TOKEN_COLOR_LIST: Array = [
 	[Color.BLUE, Color.DARK_BLUE],
 	[Color.GREEN, Color.DARK_GREEN],
 	[Color.YELLOW, Color.DARK_ORANGE],
+	[Color.BLACK, Color.GRAY],
+	[Color.WHITE, Color.GRAY],
 ]
 
 
@@ -550,6 +552,8 @@ func make_token(pos: Vector2 = Vector2.INF, text: String = "", size: int = -1, c
 	token_dict['dm'].tooltip_text = "Hold left mouse to drag.\nPress left mouse to delete.\nType a number to change label."
 	token_dict['dm'].connect("mouse_entered", func() -> void: hovered_tokens = token_dict)
 	token_dict['dm'].connect("mouse_exited", func() -> void: hovered_tokens = {})
+	token_dict['player'].connect("mouse_entered", func() -> void: hovered_tokens = token_dict)
+	token_dict['player'].connect("mouse_exited", func() -> void: hovered_tokens = {})
 
 	all_placed_tokens.append({'tokens': token_dict, 'color_id': token_color_id})
 
