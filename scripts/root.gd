@@ -107,6 +107,8 @@ var stylebox_cursor_normal: StyleBox
 @onready var colorscheme_menu: PopupMenu = $GUI/MenuBar/Colorscheme
 @onready var tool_sidebar: PanelContainer = $GUI/ToolContainer
 @onready var scroll_sidebar: PanelContainer = $GUI/ScrollBarContainer
+@onready var color_picker_container: PanelContainer = $GUI/ColorContainer
+@onready var color_picker_vbox: VBoxContainer = $GUI/ColorContainer/VBoxContainer
 
 @onready var scrollbar: VScrollBar = $GUI/ScrollBarContainer/VBoxContainer/VScrollBar
 @onready var scrollbar_label: Label = $GUI/ScrollBarContainer/VBoxContainer/Label
@@ -208,7 +210,8 @@ func _ready() -> void:
 		square_brush_button,
 		circle_brush_button,
 		selector_button,
-		token_button
+		token_button,
+		color_picker_container,
 	]
 	for i in range(len(gui_list)):
 		gui_list[i].connect("mouse_entered", func() -> void: hovering_over_gui = true)
@@ -221,8 +224,11 @@ func _ready() -> void:
 		square_brush_button,
 		circle_brush_button,
 		selector_button,
-		token_button
+		token_button,
+		color_picker_container,
 	]
+
+	populate_color_bar()
 
 	for i in range(len(sidebar_list)):
 		sidebar_list[i].connect("mouse_entered", are_we_inside_sidebar)
@@ -240,6 +246,41 @@ func _ready() -> void:
 		load_map(args[0])
 	else:
 		load_map("")
+
+
+func populate_color_bar() -> void:
+	for i in range(len(TOKEN_COLOR_LIST)):
+		var color_button: Button = Button.new()
+		color_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		color_button.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		color_button.add_theme_color_override("font_color", TOKEN_COLOR_LIST[i][0])
+		# override the stylebox to make it transparent, so we only see the text
+		var stylebox: StyleBox = color_button.get_theme_stylebox("normal").duplicate()
+		stylebox.bg_color = Color.TRANSPARENT
+		color_button.add_theme_stylebox_override("normal", stylebox)
+
+		# also override the pressed stylebox to make it transparent, so we only see the text
+		var stylebox_pressed: StyleBox = color_button.get_theme_stylebox("pressed").duplicate()
+		stylebox_pressed.bg_color = Color.TRANSPARENT
+		color_button.add_theme_stylebox_override("pressed", stylebox_pressed)
+
+
+		# make the font big
+		color_button.add_theme_font_size_override("font_size", 24)
+		color_button.add_theme_color_override("font_color_shadow", TOKEN_COLOR_LIST[i][1])
+		color_button.text = "●"
+		color_button.connect("mouse_entered", func() -> void: hovering_over_gui = true)
+		color_button.connect("mouse_exited", func() -> void: hovering_over_gui = false)
+		color_button.connect("mouse_entered", are_we_inside_sidebar)
+		color_button.connect("mouse_exited", func() -> void: in_sidebar = false)
+		color_button.connect("pressed", func() -> void:
+			print("Color button pressed: %d" % i)
+			token_color_index = i
+			update_tool_visuals()
+		)
+		color_picker_vbox.add_child(color_button)
+
+
 
 func update_cursor_position() -> void:
 	if hovering_over_menu:
@@ -639,12 +680,13 @@ func update_tool_visuals() -> void:
 	brush_size = last_brush_size
 	brush_size_changed.emit(brush_size)
 	scrollbar_label.text = str(int(brush_size))
+	color_picker_container.visible = current_tool == tool.TOKEN_PLACER
+	scroll_sidebar.visible = current_tool != tool.SELECTOR
 
 	match current_tool:
 		tool.SQUARE_BRUSH:
 			set_cursor_shape(CursorShape.CURSOR_CROSS)
 			cursor_panel.add_theme_stylebox_override("panel", stylebox_cursor_normal)
-
 
 			square_brush_button.add_theme_stylebox_override("normal", stylebox_button_pressed)
 			tool_label.text = "Square brush"
@@ -663,7 +705,6 @@ func update_tool_visuals() -> void:
 		tool.SELECTOR:
 			set_cursor_shape()
 			cursor_panel.add_theme_stylebox_override("panel", stylebox_cursor_normal)
-			scroll_sidebar.visible = false
 
 			selector_button.add_theme_stylebox_override("normal", stylebox_button_pressed)
 			reshape_selector_cursor_panel()
