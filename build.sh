@@ -1,7 +1,9 @@
 #!/bin/sh
-scons target=template_release \
-	optimize=size \
-	lto=full \
+scons \
+    platform=windows \
+    target=template_release \
+    arch=x86_64 \
+	optimize=size_extra \
 	module_text_server_adv_enabled=no \
 	module_text_server_fb_enabled=yes \
 	disable_3d=yes \

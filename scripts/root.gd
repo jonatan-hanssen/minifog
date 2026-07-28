@@ -41,9 +41,9 @@ const FOG_COLOR_LIST: Array = [
 ]
 
 const TOKEN_COLOR_LIST: Array = [
+	[Color.GREEN, Color.DARK_GREEN],
 	[Color.RED, Color.DARK_RED],
 	[Color.BLUE, Color.DARK_BLUE],
-	[Color.GREEN, Color.DARK_GREEN],
 	[Color.YELLOW, Color.DARK_ORANGE],
 	[Color.BLACK, Color.GRAY],
 	[Color.WHITE, Color.GRAY],
@@ -65,8 +65,10 @@ var m1_held := false
 var m2_held := false
 var selecting := false
 var hovering_over_gui := false
+var hovering_over_menu := false
 var performance_mode := false
 var in_sidebar := false
+var is_dirty := false
 
 var prev_mask: Texture2D
 
@@ -102,7 +104,6 @@ var stylebox_cursor_normal: StyleBox
 @onready var menu_bar: MenuBar = $GUI/MenuBar
 @onready var file_menu: PopupMenu = $GUI/MenuBar/File
 @onready var help_menu: PopupMenu = $GUI/MenuBar/Help
-@onready var saving_label: Label = $GUI/SavingLabel
 @onready var colorscheme_menu: PopupMenu = $GUI/MenuBar/Colorscheme
 @onready var tool_sidebar: PanelContainer = $GUI/ToolContainer
 @onready var scroll_sidebar: PanelContainer = $GUI/ScrollBarContainer
@@ -144,6 +145,8 @@ var stylebox_cursor_normal: StyleBox
 
 func _ready() -> void:
 	get_window().title = "DM Window"
+
+	get_window().files_dropped.connect(func(paths: PackedStringArray) -> void: load_map(paths[0]))
 
 	load_dialog.connect("file_selected", func(path: String) -> void: load_map(path))
 	save_dialog.connect("file_selected", func(path: String) -> void: write_map(path))
@@ -193,6 +196,9 @@ func _ready() -> void:
 	update_tool_visuals()
 	select_tool(tool.SQUARE_BRUSH)
 
+	menu_bar.connect("mouse_entered", func() -> void: hovering_over_menu = true)
+	menu_bar.connect("mouse_exited", func() -> void: hovering_over_menu = false)
+
 	var gui_list: Array = [
 		menu_bar,
 		file_menu,
@@ -233,9 +239,11 @@ func _ready() -> void:
 	if len(args) > 0:
 		load_map(args[0])
 	else:
-		load_map("noargs")
+		load_map("")
 
 func update_cursor_position() -> void:
+	if hovering_over_menu:
+		cursor_node.visible = false
 	if current_tool != tool.SELECTOR:
 		if in_sidebar:
 			cursor_node.position = dm_camera.position - Vector2.ONE * brush_size / 2
@@ -260,7 +268,8 @@ func _input(event: InputEvent) -> void:
 
 		if not hovered_tokens.is_empty() and event.pressed:
 			if event.button_index == MOUSE_BUTTON_LEFT:
-				undo_list.append(["move_token", {'tokens': hovered_tokens, 'position': hovered_tokens['dm'].position}])
+				add_to_undo_list(["move_token", {'tokens': hovered_tokens, 'position': hovered_tokens['dm'].position}])
+				is_dirty = true
 				if len(undo_list) > UNDO_LIST_MAX_ALL:
 					undo_list.pop_front()
 				held_tokens = hovered_tokens
@@ -271,7 +280,8 @@ func _input(event: InputEvent) -> void:
 				var player_token : Panel = hovered_tokens['player']
 				dm_token.visible = false
 				player_token.visible = false
-				undo_list.append(["remove_token", {'tokens': {'dm': dm_token, 'player': player_token}}])
+				add_to_undo_list(["remove_token", {'tokens': {'dm': dm_token, 'player': player_token}}])
+				is_dirty = true
 				if len(undo_list) > UNDO_LIST_MAX_ALL:
 					undo_list.pop_front()
 
@@ -283,7 +293,6 @@ func _input(event: InputEvent) -> void:
 				if not event.pressed:
 					held_tokens['dm'].mouse_default_cursor_shape = CursorShape.CURSOR_POINTING_HAND
 					held_tokens = {}
-			print('returning')
 			return
 
 
@@ -296,7 +305,8 @@ func _input(event: InputEvent) -> void:
 							hovered_tokens = tokens
 							cursor_node.visible = false
 							set_cursor_shape(CursorShape.CURSOR_MOVE)
-							undo_list.append(["place_token", {'tokens': tokens}])
+							add_to_undo_list(["place_token", {'tokens': tokens}])
+							is_dirty = true
 							if len(undo_list) > UNDO_LIST_MAX_ALL:
 								undo_list.pop_front()
 
@@ -392,7 +402,8 @@ func process_keypresses(event: InputEventKey) -> void:
 	if event.pressed:
 		if not hovered_tokens.is_empty() and event.keycode in range(KEY_0, KEY_9 + 1):
 			var previous_number: String = hovered_tokens['dm'].get_child(0).text
-			undo_list.append(['change_number', {'tokens': hovered_tokens, 'number': previous_number}])
+			add_to_undo_list(['change_number', {'tokens': hovered_tokens, 'number': previous_number}])
+			is_dirty = true
 			if len(undo_list) > UNDO_LIST_MAX_ALL:
 				undo_list.pop_front()
 			var number := str(event.keycode - KEY_0)
@@ -436,13 +447,16 @@ func process_keypresses(event: InputEventKey) -> void:
 
 			KEY_S:
 				if ctrl_held:
-					if current_file_path.ends_with(".map"):
+					if current_file_path == "":
+						warning.title = "Cannot save an empty map"
+						warning.dialog_text = "Cannot save an empty map"
+						warning.popup_centered()
+					elif current_file_path.ends_with(".map"):
 						set_cursor_shape(CursorShape.CURSOR_WAIT)
-						saving_label.visible = true
+						get_window().title = "DM Window (saving...)"
 						await get_tree().process_frame
 						await get_tree().process_frame
 						write_map(current_file_path)
-						saving_label.visible = false
 						set_cursor_shape()
 					else:
 						save_dialog.popup()
@@ -690,9 +704,10 @@ func copy_viewport_texture() -> void:
 	image.convert(Image.FORMAT_R8)
 	var image_texture: Texture2D = ImageTexture.new()
 	image_texture = ImageTexture.create_from_image(image)
-	undo_list.append(["draw", {"mask": prev_mask}])
+	add_to_undo_list(["draw", {"mask": prev_mask}])
+	is_dirty = true
 	# just to make sure we don't use too much RAM
-	# other undos are fine though probably don't take up much space
+	# other undos are fine though they don't take up much space
 	if len(undo_list) > UNDO_LIST_MAX_IMAGES:
 		undo_list.pop_front()
 	prev_mask = image_texture
@@ -720,24 +735,17 @@ func update_fog_texture(color: Color) -> void:
 
 func get_fog_size(image_size: Vector2i) -> void:
 	if image_size[0] > image_size[1]:
-		fog_image_width = image_size[0] * fog_scaling
-		fog_image_height = image_size[0] * fog_scaling
+		fog_image_width = int(image_size[0] * fog_scaling)
+		fog_image_height = int(image_size[0] * fog_scaling)
 	else:
-		fog_image_width = image_size[1] * fog_scaling
-		fog_image_height = image_size[1] * fog_scaling
+		fog_image_width = int(image_size[1] * fog_scaling)
+		fog_image_height = int(image_size[1] * fog_scaling)
+
 
 
 func load_map(path: String) -> void:
-	undo_list = []
-
-	for dictionary in all_placed_tokens:
-		if is_instance_valid(dictionary['tokens']['dm']):
-			dictionary['tokens']['dm'].queue_free()
-			dictionary['tokens']['player'].queue_free()
-
-	all_placed_tokens = []
-
-	if path == "noargs":
+	# if empty we "load" the intro screens with the degus
+	if path == "":
 		get_fog_size(InfoDegus.get_size())
 		mask_image = Image.create(fog_image_width, fog_image_width, false, Image.FORMAT_R8)
 		mask_image.fill(Color.RED)
@@ -764,8 +772,17 @@ func load_map(path: String) -> void:
 			warning.popup_centered()
 			return
 
+		undo_list = []
+
+		for dictionary in all_placed_tokens:
+			if is_instance_valid(dictionary['tokens']['dm']):
+				dictionary['tokens']['dm'].queue_free()
+				dictionary['tokens']['player'].queue_free()
+
+		all_placed_tokens = []
 
 		if path.ends_with(".map"):
+			# .map is just a renamed zip with two images and a json in it
 			var reader: ZIPReader = ZIPReader.new()
 			var error := reader.open(path)
 
@@ -798,6 +815,7 @@ func load_map(path: String) -> void:
 			reader.close()
 
 		else:
+			# if not .map, this is a new image
 			map_image = Image.new()
 			var error := map_image.load(path)
 
@@ -848,6 +866,7 @@ func load_map(path: String) -> void:
 
 		dm_fog.material.set_shader_parameter("alpha_ceil", 0.5)
 		player_fog.material.set_shader_parameter("alpha_ceil", 1)
+
 
 	drawing_viewport.render_target_clear_mode = SubViewport.CLEAR_MODE_ONCE
 
@@ -923,6 +942,7 @@ func write_map(path: String) -> void:
 		warning.popup_centered()
 		return
 
+	get_window().title = "DM Window"
 	var writer: ZIPPacker = ZIPPacker.new()
 	var error := writer.open(path)
 
@@ -989,6 +1009,14 @@ func _on_file_id_pressed(id: int) -> void:
 	if id == 2:
 		get_tree().quit()
 
+func add_to_undo_list(action: Variant) -> void:
+	undo_list.append(action)
+	if current_file_path == "":
+		return
+	is_dirty = true
+	get_window().title = "DM Window *"
+
+
 
 func update_colorscheme(id: int) -> void:
 	fog_color_index = id
@@ -997,3 +1025,6 @@ func update_colorscheme(id: int) -> void:
 
 	for i in range(len(FOG_COLOR_LIST)):
 		colorscheme_menu.set_item_checked(i, i == id)
+
+func on_files_dropped(files: PackedStringArray) -> void:
+	print(files)

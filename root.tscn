@@ -1,4 +1,4 @@
-[gd_scene load_steps=59 format=3 uid="uid://ct4l808ib7i8p"]
+[gd_scene format=3 uid="uid://ct4l808ib7i8p"]
 
 [ext_resource type="Script" uid="uid://knnd3tgx0d0p" path="res://scripts/root.gd" id="1_fnbe8"]
 [ext_resource type="Script" uid="uid://dt52a1ixuy1te" path="res://scripts/panned_camera.gd" id="2_krtgi"]
@@ -340,11 +340,6 @@ PopupMenu/styles/labeled_separator_right = SubResource("StyleBoxLine_umcdv")
 PopupMenu/styles/panel = SubResource("StyleBoxFlat_qheka")
 PopupMenu/styles/separator = SubResource("StyleBoxLine_2gyni")
 
-[sub_resource type="LabelSettings" id="LabelSettings_womdi"]
-font_size = 19
-outline_size = 1
-outline_color = Color(0.103744, 0.103744, 0.103744, 1)
-
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1tktk"]
 bg_color = Color(0.956863, 0.956863, 0.956863, 1)
 corner_radius_top_left = 8
@@ -356,12 +351,8 @@ expand_margin_top = 6.0
 expand_margin_right = 6.0
 expand_margin_bottom = 6.0
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_gd4vy"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_tw3kd"]
 bg_color = Color(0.6, 0.6, 0.6, 0)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
 border_color = Color(0.501406, 0.501407, 0.501406, 1)
 corner_radius_top_left = 2
 corner_radius_top_right = 2
@@ -370,8 +361,12 @@ corner_radius_bottom_left = 2
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_gd4vy"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_tw3kd"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_gd4vy"]
 bg_color = Color(0.6, 0.6, 0.6, 0)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
 border_color = Color(0.501406, 0.501407, 0.501406, 1)
 corner_radius_top_left = 2
 corner_radius_top_right = 2
@@ -408,13 +403,13 @@ corner_radius_bottom_left = 3
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_a0tci"]
 
-[node name="Root" type="Control"]
+[node name="Root" type="Control" unique_id=473491626]
 z_index = 6
 layout_mode = 3
 anchors_preset = 0
 script = ExtResource("1_fnbe8")
 
-[node name="DmFog" type="TextureRect" parent="."]
+[node name="DmFog" type="TextureRect" parent="." unique_id=1730367683]
 visible = false
 material = SubResource("ShaderMaterial_xsao3")
 layout_mode = 0
@@ -424,13 +419,13 @@ texture = ExtResource("4_ak8k0")
 expand_mode = 1
 metadata/_edit_use_anchors_ = true
 
-[node name="Warning" type="AcceptDialog" parent="."]
+[node name="Warning" type="AcceptDialog" parent="." unique_id=69026165]
 force_native = true
 
-[node name="Camera" type="Camera2D" parent="."]
+[node name="Camera" type="Camera2D" parent="." unique_id=1849847040]
 script = ExtResource("2_krtgi")
 
-[node name="LoadDialog" type="FileDialog" parent="."]
+[node name="LoadDialog" type="FileDialog" parent="." unique_id=1731820547]
 title = "Open a File"
 size = Vector2i(600, 400)
 ok_button_text = "Open"
@@ -439,32 +434,32 @@ file_mode = 0
 access = 2
 use_native_dialog = true
 
-[node name="SaveDialog" type="FileDialog" parent="."]
+[node name="SaveDialog" type="FileDialog" parent="." unique_id=167289146]
 dialog_hide_on_ok = true
 access = 2
 use_native_dialog = true
 
-[node name="DrawingViewport" type="SubViewport" parent="."]
+[node name="DrawingViewport" type="SubViewport" parent="." unique_id=567394600]
 render_target_clear_mode = 2
 render_target_update_mode = 4
 
-[node name="DrawingNode" type="Node2D" parent="DrawingViewport"]
+[node name="DrawingNode" type="Node2D" parent="DrawingViewport" unique_id=1065534718]
 z_index = 1
 script = ExtResource("3_iu72d")
 
-[node name="DrawingTexture" type="TextureRect" parent="DrawingViewport"]
+[node name="DrawingTexture" type="TextureRect" parent="DrawingViewport" unique_id=819942749]
 offset_right = 40.0
 offset_bottom = 40.0
 
-[node name="GUI" type="CanvasLayer" parent="."]
+[node name="GUI" type="CanvasLayer" parent="." unique_id=1714547435]
 
-[node name="MenuBar" type="MenuBar" parent="GUI"]
+[node name="MenuBar" type="MenuBar" parent="GUI" unique_id=1630845137]
 top_level = true
 offset_right = 40.0
 offset_bottom = 40.0
 theme = SubResource("Theme_6yvrb")
 
-[node name="File" type="PopupMenu" parent="GUI/MenuBar"]
+[node name="File" type="PopupMenu" parent="GUI/MenuBar" unique_id=253813484]
 prefer_native_menu = true
 item_count = 3
 item_0/text = "Load"
@@ -474,7 +469,7 @@ item_1/id = 1
 item_2/text = "Exit"
 item_2/id = 2
 
-[node name="Colorscheme" type="PopupMenu" parent="GUI/MenuBar"]
+[node name="Colorscheme" type="PopupMenu" parent="GUI/MenuBar" unique_id=323775306]
 auto_translate_mode = 1
 title = "Change fog color"
 prefer_native_menu = true
@@ -505,22 +500,14 @@ item_7/text = "Lime"
 item_7/checkable = 2
 item_7/id = 7
 
-[node name="Help" type="PopupMenu" parent="GUI/MenuBar"]
+[node name="Help" type="PopupMenu" parent="GUI/MenuBar" unique_id=1907150163]
 auto_translate_mode = 1
 prefer_native_menu = true
 item_count = 1
 item_0/text = "Show keybinds"
 item_0/id = 0
 
-[node name="SavingLabel" type="Label" parent="GUI"]
-visible = false
-offset_left = 233.0
-offset_right = 324.0
-offset_bottom = 28.0
-text = "Saving . . ."
-label_settings = SubResource("LabelSettings_womdi")
-
-[node name="ToolContainer" type="PanelContainer" parent="GUI"]
+[node name="ToolContainer" type="PanelContainer" parent="GUI" unique_id=963964972]
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
@@ -531,75 +518,77 @@ offset_bottom = 215.0
 grow_horizontal = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_1tktk")
 
-[node name="VBoxContainer" type="VBoxContainer" parent="GUI/ToolContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="GUI/ToolContainer" unique_id=1738873387]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="Label" type="Label" parent="GUI/ToolContainer/VBoxContainer"]
+[node name="Label" type="Label" parent="GUI/ToolContainer/VBoxContainer" unique_id=419381433]
 layout_mode = 2
 theme_override_colors/font_color = Color(0, 0, 0, 1)
 text = "Tools:"
 horizontal_alignment = 1
 
-[node name="SquareBrushButton" type="Button" parent="GUI/ToolContainer/VBoxContainer"]
+[node name="SquareBrushButton" type="Button" parent="GUI/ToolContainer/VBoxContainer" unique_id=1098128438]
 layout_mode = 2
 size_flags_vertical = 3
 size_flags_stretch_ratio = 2.0
 tooltip_text = "Square Brush (Hold down to erase)"
-theme_override_styles/hover = SubResource("StyleBoxFlat_gd4vy")
-theme_override_styles/pressed = SubResource("StyleBoxEmpty_gd4vy")
 theme_override_styles/normal = SubResource("StyleBoxFlat_tw3kd")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_gd4vy")
+theme_override_styles/hover = SubResource("StyleBoxFlat_gd4vy")
 icon = ExtResource("6_tw3kd")
 icon_alignment = 1
 expand_icon = true
 
-[node name="CircleBrushButton" type="Button" parent="GUI/ToolContainer/VBoxContainer"]
+[node name="CircleBrushButton" type="Button" parent="GUI/ToolContainer/VBoxContainer" unique_id=1619915218]
 layout_mode = 2
 size_flags_vertical = 3
 size_flags_stretch_ratio = 2.0
 tooltip_text = "Circle Brush (Hold down to erase)"
-theme_override_styles/hover = SubResource("StyleBoxFlat_gd4vy")
-theme_override_styles/pressed = SubResource("StyleBoxEmpty_gd4vy")
 theme_override_styles/normal = SubResource("StyleBoxFlat_tw3kd")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_gd4vy")
+theme_override_styles/hover = SubResource("StyleBoxFlat_gd4vy")
 icon = ExtResource("7_gd4vy")
 icon_alignment = 1
 expand_icon = true
 
-[node name="SelectorButton" type="Button" parent="GUI/ToolContainer/VBoxContainer"]
+[node name="SelectorButton" type="Button" parent="GUI/ToolContainer/VBoxContainer" unique_id=1547592824]
 layout_mode = 2
 size_flags_vertical = 3
 size_flags_stretch_ratio = 2.0
 tooltip_text = "Selector (Hold down to select area, release to erase)"
-theme_override_styles/hover = SubResource("StyleBoxFlat_gd4vy")
-theme_override_styles/pressed = SubResource("StyleBoxEmpty_gd4vy")
 theme_override_styles/normal = SubResource("StyleBoxFlat_tw3kd")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_gd4vy")
+theme_override_styles/hover = SubResource("StyleBoxFlat_gd4vy")
 icon = ExtResource("6_ue7po")
 icon_alignment = 1
 expand_icon = true
 
-[node name="TokenButton" type="Button" parent="GUI/ToolContainer/VBoxContainer"]
+[node name="TokenButton" type="Button" parent="GUI/ToolContainer/VBoxContainer" unique_id=62399640]
 layout_mode = 2
 size_flags_vertical = 3
 size_flags_stretch_ratio = 2.0
-tooltip_text = "Selector (Hold down to select area, release to erase)"
-theme_override_styles/hover = SubResource("StyleBoxFlat_gd4vy")
-theme_override_styles/pressed = SubResource("StyleBoxEmpty_gd4vy")
+tooltip_text = "Token placer (click to place,
+left click on a token to delete,
+type a number to assign it to the token)"
 theme_override_styles/normal = SubResource("StyleBoxFlat_tw3kd")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_gd4vy")
+theme_override_styles/hover = SubResource("StyleBoxFlat_gd4vy")
 icon = ExtResource("9_gd4vy")
 icon_alignment = 1
 expand_icon = true
 
-[node name="HSeparator" type="HSeparator" parent="GUI/ToolContainer/VBoxContainer"]
+[node name="HSeparator" type="HSeparator" parent="GUI/ToolContainer/VBoxContainer" unique_id=119126027]
 layout_mode = 2
 
-[node name="ToolLabel" type="Label" parent="GUI/ToolContainer/VBoxContainer"]
+[node name="ToolLabel" type="Label" parent="GUI/ToolContainer/VBoxContainer" unique_id=52482133]
 layout_mode = 2
 theme_override_colors/font_color = Color(0, 0, 0, 1)
 theme_override_font_sizes/font_size = 12
 text = "Selector"
 horizontal_alignment = 1
 
-[node name="ScrollBarContainer" type="PanelContainer" parent="GUI"]
+[node name="ScrollBarContainer" type="PanelContainer" parent="GUI" unique_id=1571347224]
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
@@ -611,10 +600,10 @@ grow_horizontal = 0
 grow_vertical = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_1tktk")
 
-[node name="VBoxContainer" type="VBoxContainer" parent="GUI/ScrollBarContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="GUI/ScrollBarContainer" unique_id=136946193]
 layout_mode = 2
 
-[node name="VScrollBar" type="VScrollBar" parent="GUI/ScrollBarContainer/VBoxContainer"]
+[node name="VScrollBar" type="VScrollBar" parent="GUI/ScrollBarContainer/VBoxContainer" unique_id=1389752742]
 layout_mode = 2
 size_flags_horizontal = 1
 size_flags_vertical = 3
@@ -625,35 +614,36 @@ max_value = 500.0
 page = 60.0
 value = 5.0
 
-[node name="Label" type="Label" parent="GUI/ScrollBarContainer/VBoxContainer"]
+[node name="Label" type="Label" parent="GUI/ScrollBarContainer/VBoxContainer" unique_id=2052595267]
 layout_mode = 2
 theme_override_colors/font_color = Color(0, 0, 0, 1)
 text = "Size"
 horizontal_alignment = 1
 
-[node name="DmRoot" type="Node2D" parent="."]
+[node name="DmRoot" type="Node2D" parent="." unique_id=1093576586]
 
-[node name="Background" type="TextureRect" parent="DmRoot"]
+[node name="Background" type="TextureRect" parent="DmRoot" unique_id=1851550757]
 z_index = -1
 offset_right = 40.0
 offset_bottom = 40.0
 
-[node name="PlayerWindow" type="Window" parent="."]
+[node name="PlayerWindow" type="Window" parent="." unique_id=208462062]
+oversampling_override = 1.0
 title = "Player Window"
 position = Vector2i(0, 36)
 size = Vector2i(800, 500)
 
-[node name="Camera" type="Camera2D" parent="PlayerWindow"]
+[node name="Camera" type="Camera2D" parent="PlayerWindow" unique_id=1151701474]
 script = ExtResource("2_krtgi")
 
-[node name="PlayerRoot" type="Node2D" parent="PlayerWindow"]
+[node name="PlayerRoot" type="Node2D" parent="PlayerWindow" unique_id=1470968892]
 
-[node name="Background" type="TextureRect" parent="PlayerWindow/PlayerRoot"]
+[node name="Background" type="TextureRect" parent="PlayerWindow/PlayerRoot" unique_id=1424826424]
 z_index = -1
 offset_right = 40.0
 offset_bottom = 40.0
 
-[node name="PlayerFog" type="TextureRect" parent="PlayerWindow"]
+[node name="PlayerFog" type="TextureRect" parent="PlayerWindow" unique_id=1952996210]
 visible = false
 material = SubResource("ShaderMaterial_lrpuh")
 offset_right = 256.0
@@ -662,19 +652,19 @@ texture = ExtResource("4_ak8k0")
 expand_mode = 1
 metadata/_edit_use_anchors_ = true
 
-[node name="CursorNode" type="Node2D" parent="."]
+[node name="CursorNode" type="Node2D" parent="." unique_id=598258814]
 
-[node name="TextureRect" type="TextureRect" parent="CursorNode"]
+[node name="TextureRect" type="TextureRect" parent="CursorNode" unique_id=138592451]
 offset_right = 40.0
 offset_bottom = 40.0
 expand_mode = 1
 
-[node name="Panel" type="Panel" parent="CursorNode"]
+[node name="Panel" type="Panel" parent="CursorNode" unique_id=30944564]
 offset_right = 40.0
 offset_bottom = 40.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_huihk")
 
-[node name="PlayerViewRectangle" type="Panel" parent="."]
+[node name="PlayerViewRectangle" type="Panel" parent="." unique_id=1497457654]
 visible = false
 layout_mode = 0
 offset_left = 133.0
@@ -683,7 +673,7 @@ offset_right = 173.0
 offset_bottom = -185.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_bf3um")
 
-[node name="TextEdit" type="TextEdit" parent="PlayerViewRectangle"]
+[node name="TextEdit" type="TextEdit" parent="PlayerViewRectangle" unique_id=559168677]
 visible = false
 layout_mode = 0
 offset_left = 3.0
@@ -703,6 +693,6 @@ shortcut_keys_enabled = false
 selecting_enabled = false
 deselect_on_focus_loss_enabled = false
 drag_and_drop_selection_enabled = false
-virtual_keyboard_enabled = false
 middle_mouse_paste_enabled = false
 wrap_mode = 1
+virtual_keyboard_enabled = false
