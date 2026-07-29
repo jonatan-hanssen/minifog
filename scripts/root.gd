@@ -12,25 +12,18 @@ enum tool { SQUARE_BRUSH, ROUND_BRUSH, SELECTOR, TOKEN_PLACER, POINTER, LENGTH }
 
 const PerlinTexture = preload("res://resources/Fog.jpg")
 const PlasmaTexture = preload("res://resources/Plasma.jpg")
-
 const InfoDegus = preload("res://resources/Info.png")
 const PlayerInfoDegus = preload("res://resources/PlayerInfo.png")
-
 const Pointer = preload("res://resources/PointerIcon.png")
-
 const BRUSH_SIZE_MIN := 5
 const BRUSH_SIZE_MAX := 500
-
 const UNDO_LIST_MAX_IMAGES := 20
 const UNDO_LIST_MAX_ALL := 100
-
 const MAX_IMAGE_SIZE := 3000.0
-
 const CORNER_BASE_SIZE := 16
-
 const FOG_COLOR_LIST: Array = [
-	Color.BURLYWOOD,  # not actually used, stand in for fog
-	Color.DEEP_PINK,  # not actually used, stand in for colorful fog
+	Color.BURLYWOOD, # not actually used, stand in for fog
+	Color.DEEP_PINK, # not actually used, stand in for colorful fog
 	Color.BLACK,
 	Color.WHITE,
 	Color.DARK_GRAY,
@@ -38,7 +31,6 @@ const FOG_COLOR_LIST: Array = [
 	Color.BLUE,
 	Color.LIME,
 ]
-
 const TOKEN_COLOR_LIST: Array = [
 	[Color.GREEN, Color.DARK_GREEN],
 	[Color.RED, Color.DARK_RED],
@@ -48,17 +40,14 @@ const TOKEN_COLOR_LIST: Array = [
 	[Color.WHITE, Color.GRAY],
 ]
 
-
 var current_tool: int = 0
 var fog_color_index: int = 0
 var token_color_index: int = 0
 var brush_size: int = 50
 var fog_image_height: int
 var fog_image_width: int
-
 var last_brush_size: int = 50
 var last_token_size: int = 50
-
 var ctrl_held := false
 var m1_held := false
 var m2_held := false
@@ -68,37 +57,25 @@ var hovering_over_menu := false
 var performance_mode := false
 var in_sidebar := false
 var is_dirty := false
-
 var prev_mask: Texture2D
-
 var undo_list: Array = []
 var corner_list: Array = []
-
 var selector_start_pos := Vector2.ZERO
 var selector_end_pos := Vector2.ZERO
-
 var all_placed_tokens: Array[Dictionary] = []
-
 var current_file_path: String
-
 var fog_scaling: float = 1.2
-
 var mask_image_texture: Texture2D
-
 var mask_texture: ImageTexture
-
 var map_image: Image
 var mask_image: Image
 var light_brush: Image
 var dark_brush: Image
-
-var hovered_tokens: Dictionary[String, Panel] = {}
-var held_tokens: Dictionary[String, Panel] = {}
-
+var hovered_tokens: Dictionary[String, Panel] = { }
+var held_tokens: Dictionary[String, Panel] = { }
 var stylebox_button_pressed: StyleBox
 var stylebox_button_not_pressed: StyleBox
 var stylebox_cursor_normal: StyleBox
-
 
 @onready var menu_bar: MenuBar = $GUI/MenuBar
 @onready var file_menu: PopupMenu = $GUI/MenuBar/File
@@ -108,7 +85,6 @@ var stylebox_cursor_normal: StyleBox
 @onready var scroll_sidebar: PanelContainer = $GUI/ScrollBarContainer
 @onready var color_picker_container: PanelContainer = $GUI/ColorContainer
 @onready var color_picker_vbox: VBoxContainer = $GUI/ColorContainer/VBoxContainer
-
 @onready var scrollbar: VScrollBar = $GUI/ScrollBarContainer/VBoxContainer/VScrollBar
 @onready var scrollbar_label: Label = $GUI/ScrollBarContainer/VBoxContainer/Label
 @onready var square_brush_button: Button = $GUI/ToolContainer/VBoxContainer/SquareBrushButton
@@ -116,33 +92,26 @@ var stylebox_cursor_normal: StyleBox
 @onready var selector_button: Button = $GUI/ToolContainer/VBoxContainer/SelectorButton
 @onready var token_button: Button = $GUI/ToolContainer/VBoxContainer/TokenButton
 @onready var pointer_button: Button = $GUI/ToolContainer/VBoxContainer/PointerButton
-
-
 # @onready var separator : HSeparator = $GUI/ToolContainer/VBoxContainer/Separator
 @onready var tool_label: Label = $GUI/ToolContainer/VBoxContainer/ToolLabel
-
 @onready var load_dialog: FileDialog = $LoadDialog
 @onready var save_dialog: FileDialog = $SaveDialog
 @onready var warning: AcceptDialog = $Warning
 @onready var cursor_node: Node2D = $CursorNode
 @onready var cursor_panel: Panel = $CursorNode/Panel
-
 @onready var drawing_viewport: SubViewport = $DrawingViewport
 @onready var drawing_node: Node2D = $DrawingViewport/DrawingNode
 @onready var drawing_texture: TextureRect = $DrawingViewport/DrawingTexture
-
 @onready var dm_camera: Camera2D = $Camera
 @onready var dm_fog: TextureRect = $DmFog
 @onready var dm_root: Node2D = $DmRoot
 @onready var dm_background: TextureRect = $DmRoot/Background
-
 @onready var player_window: Window = $PlayerWindow
 @onready var player_camera: Camera2D = $PlayerWindow/Camera
 @onready var player_fog: TextureRect = $PlayerWindow/PlayerFog
 @onready var player_root: Node2D = $PlayerWindow/PlayerRoot
 @onready var player_background: TextureRect = $PlayerWindow/PlayerRoot/Background
 @onready var player_pointer: Panel = $PlayerWindow/PlayerPointer
-
 @onready var player_view: Panel = $PlayerViewRectangle
 @onready var player_view_text: TextEdit = $PlayerViewRectangle/TextEdit
 
@@ -271,50 +240,9 @@ func _ready() -> void:
 		load_map("")
 
 
-func populate_color_bar() -> void:
-	for i in range(len(TOKEN_COLOR_LIST)):
-		var color_button: Button = Button.new()
-		color_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		color_button.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		color_button.add_theme_color_override("font_color", TOKEN_COLOR_LIST[i][0])
-		# override the stylebox to make it transparent, so we only see the text
-		var stylebox: StyleBox = color_button.get_theme_stylebox("normal").duplicate()
-		stylebox.bg_color = Color.TRANSPARENT
-		color_button.add_theme_stylebox_override("normal", stylebox)
-
-		# also override the pressed stylebox to make it transparent, so we only see the text
-		var stylebox_pressed: StyleBox = color_button.get_theme_stylebox("pressed").duplicate()
-		stylebox_pressed.bg_color = Color.TRANSPARENT
-		color_button.add_theme_stylebox_override("pressed", stylebox_pressed)
-
-
-		# make the font big
-		color_button.add_theme_font_size_override("font_size", 24)
-		color_button.add_theme_color_override("font_color_shadow", TOKEN_COLOR_LIST[i][1])
-		color_button.text = "●"
-		color_button.connect("mouse_entered", func() -> void: hovering_over_gui = true)
-		color_button.connect("mouse_exited", func() -> void: hovering_over_gui = false)
-		color_button.connect("mouse_entered", are_we_inside_sidebar)
-		color_button.connect("mouse_exited", func() -> void: in_sidebar = false)
-		color_button.connect("pressed", func() -> void:
-			token_color_index = i
-			update_tool_visuals()
-		)
-		color_picker_vbox.add_child(color_button)
-
-
-
-func update_cursor_position() -> void:
-	if hovering_over_menu or hovering_over_gui:
-		cursor_node.visible = false
-		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-	if current_tool != tool.SELECTOR:
-		if in_sidebar:
-			cursor_node.position = dm_camera.position - Vector2.ONE * brush_size / 2
-		else:
-			cursor_node.position = get_global_mouse_position() - Vector2.ONE * brush_size / 2
-	else:
-		reshape_selector_cursor_panel()
+func _process(_delta: float) -> void:
+	move_player_view()
+	update_cursor_position()
 
 
 func _input(event: InputEvent) -> void:
@@ -322,7 +250,6 @@ func _input(event: InputEvent) -> void:
 
 	if event is InputEventMouseMotion and current_tool == tool.POINTER:
 		player_pointer.position = get_global_mouse_position() - player_pointer.size / 2
-
 
 	if event is InputEventKey:
 		process_keypresses(event)
@@ -336,7 +263,7 @@ func _input(event: InputEvent) -> void:
 
 		if not hovered_tokens.is_empty() and event.pressed:
 			if event.button_index == MOUSE_BUTTON_LEFT:
-				add_to_undo_list(["move_token", {'tokens': hovered_tokens, 'position': hovered_tokens['dm'].position}])
+				add_to_undo_list(["move_token", { 'tokens': hovered_tokens, 'position': hovered_tokens['dm'].position }])
 				is_dirty = true
 				if len(undo_list) > UNDO_LIST_MAX_ALL:
 					undo_list.pop_front()
@@ -344,25 +271,24 @@ func _input(event: InputEvent) -> void:
 				held_tokens['dm'].mouse_default_cursor_shape = CursorShape.CURSOR_MOVE
 
 			if event.button_index == MOUSE_BUTTON_RIGHT:
-				var dm_token : Panel = hovered_tokens['dm']
-				var player_token : Panel = hovered_tokens['player']
+				var dm_token: Panel = hovered_tokens['dm']
+				var player_token: Panel = hovered_tokens['player']
 				dm_token.visible = false
 				player_token.visible = false
-				add_to_undo_list(["remove_token", {'tokens': {'dm': dm_token, 'player': player_token}}])
+				add_to_undo_list(["remove_token", { 'tokens': { 'dm': dm_token, 'player': player_token } }])
 				is_dirty = true
 				if len(undo_list) > UNDO_LIST_MAX_ALL:
 					undo_list.pop_front()
 
-				hovered_tokens = {}
+				hovered_tokens = { }
 				return
 
 		if not held_tokens.is_empty():
 			if event.button_index == MOUSE_BUTTON_LEFT:
 				if not event.pressed:
 					held_tokens['dm'].mouse_default_cursor_shape = CursorShape.CURSOR_POINTING_HAND
-					held_tokens = {}
+					held_tokens = { }
 			return
-
 
 		match current_tool:
 			tool.TOKEN_PLACER:
@@ -373,16 +299,14 @@ func _input(event: InputEvent) -> void:
 							hovered_tokens = tokens
 							cursor_node.visible = false
 							set_cursor_shape(CursorShape.CURSOR_MOVE)
-							add_to_undo_list(["place_token", {'tokens': tokens}])
+							add_to_undo_list(["place_token", { 'tokens': tokens }])
 							is_dirty = true
 							if len(undo_list) > UNDO_LIST_MAX_ALL:
 								undo_list.pop_front()
-
-
 			tool.SELECTOR:
 				if (
-					event.button_index == MOUSE_BUTTON_LEFT
-					or event.button_index == MOUSE_BUTTON_RIGHT
+						event.button_index == MOUSE_BUTTON_LEFT
+						or event.button_index == MOUSE_BUTTON_RIGHT
 				):
 					if event.pressed:
 						selecting = true
@@ -400,7 +324,6 @@ func _input(event: InputEvent) -> void:
 						m2_held = event.pressed
 						on_m2_pressed.emit(event.pressed)
 					reshape_selector_cursor_panel()
-
 			_:
 				if event.button_index == MOUSE_BUTTON_LEFT:
 					drawing_texture.visible = false
@@ -425,12 +348,10 @@ func _input(event: InputEvent) -> void:
 					set_cursor_shape(CursorShape.CURSOR_DRAG)
 				else:
 					update_tool_visuals()
-
 			MOUSE_BUTTON_WHEEL_UP:
 				if ctrl_held:
 					update_brush_size(min(max(BRUSH_SIZE_MIN, brush_size - 5), BRUSH_SIZE_MAX))
 					scrollbar.set_value_no_signal(brush_size)
-
 			MOUSE_BUTTON_WHEEL_DOWN:
 				if ctrl_held:
 					update_brush_size(min(max(BRUSH_SIZE_MIN, brush_size + 5), BRUSH_SIZE_MAX))
@@ -463,6 +384,52 @@ func _input(event: InputEvent) -> void:
 				set_cursor_shape(CursorShape.CURSOR_POINTING_HAND)
 
 
+func populate_color_bar() -> void:
+	for i in range(len(TOKEN_COLOR_LIST)):
+		var color_button: Button = Button.new()
+		color_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		color_button.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		color_button.add_theme_color_override("font_color", TOKEN_COLOR_LIST[i][0])
+		# override the stylebox to make it transparent, so we only see the text
+		var stylebox: StyleBox = color_button.get_theme_stylebox("normal").duplicate()
+		stylebox.bg_color = Color.TRANSPARENT
+		color_button.add_theme_stylebox_override("normal", stylebox)
+
+		# also override the pressed stylebox to make it transparent, so we only see the text
+		var stylebox_pressed: StyleBox = color_button.get_theme_stylebox("pressed").duplicate()
+		stylebox_pressed.bg_color = Color.TRANSPARENT
+		color_button.add_theme_stylebox_override("pressed", stylebox_pressed)
+
+		# make the font big
+		color_button.add_theme_font_size_override("font_size", 24)
+		color_button.add_theme_color_override("font_color_shadow", TOKEN_COLOR_LIST[i][1])
+		color_button.text = "●"
+		color_button.connect("mouse_entered", func() -> void: hovering_over_gui = true)
+		color_button.connect("mouse_exited", func() -> void: hovering_over_gui = false)
+		color_button.connect("mouse_entered", are_we_inside_sidebar)
+		color_button.connect("mouse_exited", func() -> void: in_sidebar = false)
+		color_button.connect(
+			"pressed",
+			func() -> void:
+				token_color_index = i
+				update_tool_visuals()
+		)
+		color_picker_vbox.add_child(color_button)
+
+
+func update_cursor_position() -> void:
+	if hovering_over_menu or hovering_over_gui:
+		cursor_node.visible = false
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	if current_tool != tool.SELECTOR:
+		if in_sidebar:
+			cursor_node.position = dm_camera.position - Vector2.ONE * brush_size / 2
+		else:
+			cursor_node.position = get_global_mouse_position() - Vector2.ONE * brush_size / 2
+	else:
+		reshape_selector_cursor_panel()
+
+
 func process_keypresses(event: InputEventKey) -> void:
 	if event.keycode == KEY_CTRL:
 		ctrl_held = event.pressed
@@ -470,7 +437,7 @@ func process_keypresses(event: InputEventKey) -> void:
 	if event.pressed:
 		if not hovered_tokens.is_empty() and event.keycode in range(KEY_0, KEY_9 + 1):
 			var previous_number: String = hovered_tokens['dm'].get_child(0).text
-			add_to_undo_list(['change_number', {'tokens': hovered_tokens, 'number': previous_number}])
+			add_to_undo_list(['change_number', { 'tokens': hovered_tokens, 'number': previous_number }])
 			is_dirty = true
 			if len(undo_list) > UNDO_LIST_MAX_ALL:
 				undo_list.pop_front()
@@ -482,40 +449,30 @@ func process_keypresses(event: InputEventKey) -> void:
 		match event.keycode:
 			KEY_1:
 				select_tool(tool.SQUARE_BRUSH)
-
 			KEY_2:
 				select_tool(tool.ROUND_BRUSH)
-
 			KEY_3:
 				select_tool(tool.SELECTOR)
-
 			KEY_4:
 				select_tool(tool.TOKEN_PLACER)
-
 			KEY_5:
 				select_tool(tool.POINTER)
-
 			KEY_C:
 				token_color_index = (token_color_index + 1) % len(TOKEN_COLOR_LIST)
 				update_tool_visuals()
-
 			KEY_Z:
 				undo()
-
 			KEY_SPACE:
 				select_tool((current_tool + 1) % tool.LENGTH)
-
 			KEY_T:
 				var id: int = (fog_color_index + 1) % len(FOG_COLOR_LIST)
 				update_colorscheme(id)
-
 			KEY_P:
 				performance_mode = not performance_mode
 				if performance_mode:
 					Engine.max_fps = 30
 				else:
 					Engine.max_fps = 60
-
 			KEY_S:
 				if ctrl_held:
 					if current_file_path == "":
@@ -531,10 +488,8 @@ func process_keypresses(event: InputEventKey) -> void:
 						set_cursor_shape()
 					else:
 						save_dialog.popup()
-
 			KEY_L:
 				load_dialog.popup()
-
 			KEY_K:
 				# for tokens in all_placed_tokens:
 				# 	if is_instance_valid(tokens['tokens']['dm']):
@@ -562,31 +517,27 @@ func undo() -> void:
 			dm_fog.material.set_shader_parameter("mask_texture", drawing_viewport.get_texture())
 			player_fog.material.set_shader_parameter("mask_texture", drawing_viewport.get_texture())
 			prev_mask = payload['mask']
-
 		"place_token":
 			if not is_instance_valid(payload['tokens']['dm']):
 				undo()
 			else:
 				payload['tokens']['dm'].queue_free()
 				payload['tokens']['player'].queue_free()
-
 		"remove_token":
 			payload['tokens']['dm'].visible = true
 			payload['tokens']['player'].visible = true
-
 		"move_token":
 			payload['tokens']['dm'].position = payload['position']
 			payload['tokens']['player'].position = payload['position']
-
 		"change_number":
 			payload['tokens']['dm'].get_child(0).text = payload['number']
 			payload['tokens']['player'].get_child(0).text = payload['number']
 
 
 func make_token(pos: Vector2 = Vector2.INF, text: String = "", token_size_temp: int = -1, color_id: int = -1) -> Dictionary[String, Panel]:
-	var token_dict: Dictionary[String, Panel] = {}
+	var token_dict: Dictionary[String, Panel] = { }
 
-	var token_pos : Vector2
+	var token_pos: Vector2
 	if pos == Vector2.INF:
 		token_pos = get_global_mouse_position() - Vector2.ONE * brush_size / 2
 	else:
@@ -600,7 +551,6 @@ func make_token(pos: Vector2 = Vector2.INF, text: String = "", token_size_temp: 
 		var token := Panel.new()
 
 		var label := Label.new()
-
 
 		label.text = token_text
 		label.set("theme_override_font_sizes/font_size", token_size / 2)
@@ -633,14 +583,13 @@ func make_token(pos: Vector2 = Vector2.INF, text: String = "", token_size_temp: 
 			player_window.add_child(token)
 			token_dict['player'] = token
 
-
 	token_dict['dm'].tooltip_text = "Hold left mouse to drag.\nPress left mouse to delete.\nType a number to change label."
 	token_dict['dm'].connect("mouse_entered", func() -> void: hovered_tokens = token_dict)
-	token_dict['dm'].connect("mouse_exited", func() -> void: hovered_tokens = {})
+	token_dict['dm'].connect("mouse_exited", func() -> void: hovered_tokens = { })
 	token_dict['player'].connect("mouse_entered", func() -> void: hovered_tokens = token_dict)
-	token_dict['player'].connect("mouse_exited", func() -> void: hovered_tokens = {})
+	token_dict['player'].connect("mouse_exited", func() -> void: hovered_tokens = { })
 
-	all_placed_tokens.append({'tokens': token_dict, 'color_id': token_color_id})
+	all_placed_tokens.append({ 'tokens': token_dict, 'color_id': token_color_id })
 
 	return token_dict
 
@@ -658,6 +607,7 @@ func update_brush_size(value: float) -> void:
 
 	cursor_panel.size = Vector2(brush_size, brush_size)
 	update_tool_visuals()
+
 
 func set_cursor_shape(shape: CursorShape = CursorShape.CURSOR_ARROW) -> void:
 	mouse_default_cursor_shape = shape
@@ -696,7 +646,11 @@ func reshape_selector_cursor_panel() -> void:
 
 func update_tool_visuals() -> void:
 	var button_list: Array = [
-		square_brush_button, circle_brush_button, selector_button, token_button, pointer_button,
+		square_brush_button,
+		circle_brush_button,
+		selector_button,
+		token_button,
+		pointer_button,
 	]
 
 	# make all buttons unpressed
@@ -722,7 +676,6 @@ func update_tool_visuals() -> void:
 
 			square_brush_button.add_theme_stylebox_override("normal", stylebox_button_pressed)
 			tool_label.text = "Square Brush"
-
 		tool.ROUND_BRUSH:
 			var stylebox_cursor: StyleBox = cursor_panel.get_theme_stylebox("panel").duplicate()
 			set_cursor_shape(CursorShape.CURSOR_CROSS)
@@ -733,7 +686,6 @@ func update_tool_visuals() -> void:
 
 			circle_brush_button.add_theme_stylebox_override("normal", stylebox_button_pressed)
 			tool_label.text = "Round Brush"
-
 		tool.SELECTOR:
 			set_cursor_shape()
 			cursor_panel.add_theme_stylebox_override("panel", stylebox_cursor_normal)
@@ -741,7 +693,6 @@ func update_tool_visuals() -> void:
 			selector_button.add_theme_stylebox_override("normal", stylebox_button_pressed)
 			reshape_selector_cursor_panel()
 			tool_label.text = "Selector"
-
 		tool.TOKEN_PLACER:
 			var stylebox_cursor: StyleBox = cursor_panel.get_theme_stylebox("panel").duplicate()
 			set_cursor_shape(CursorShape.CURSOR_POINTING_HAND)
@@ -758,7 +709,6 @@ func update_tool_visuals() -> void:
 			token_button.add_theme_stylebox_override("normal", stylebox_button_pressed)
 
 			tool_label.text = "Token Placer"
-
 		tool.POINTER:
 			var stylebox_cursor: StyleBox = cursor_panel.get_theme_stylebox("panel").duplicate()
 			Input.set_mouse_mode(Input.MOUSE_MODE_HIDDEN)
@@ -778,6 +728,7 @@ func update_tool_visuals() -> void:
 
 	update_cursor_position()
 
+
 func update_circular_stylebox(stylebox: StyleBox) -> StyleBox:
 	stylebox.corner_detail = 32
 	stylebox.corner_radius_top_left = brush_size / 2 - 1
@@ -787,12 +738,13 @@ func update_circular_stylebox(stylebox: StyleBox) -> StyleBox:
 
 	return stylebox
 
+
 func copy_viewport_texture() -> void:
 	var image: Image = drawing_viewport.get_texture().get_image()
 	image.convert(Image.FORMAT_R8)
 	var image_texture: Texture2D = ImageTexture.new()
 	image_texture = ImageTexture.create_from_image(image)
-	add_to_undo_list(["draw", {"mask": prev_mask}])
+	add_to_undo_list(["draw", { "mask": prev_mask }])
 	is_dirty = true
 	# just to make sure we don't use too much RAM
 	# other undos are fine though they don't take up much space
@@ -811,7 +763,10 @@ func update_fog_texture(color: Color) -> void:
 		RenderingServer.set_default_clear_color(Color.WHITE)
 	else:
 		var fog_image: Image = Image.create(
-			fog_image_width, fog_image_height, false, Image.FORMAT_RGBA8
+			fog_image_width,
+			fog_image_height,
+			false,
+			Image.FORMAT_RGBA8,
 		)
 		fog_image.fill(color)
 		fog_image_texture = ImageTexture.create_from_image(fog_image)
@@ -830,7 +785,6 @@ func get_fog_size(image_size: Vector2i) -> void:
 		fog_image_height = int(image_size[1] * fog_scaling)
 
 
-
 func load_map(path: String) -> void:
 	# if empty we "load" the intro screens with the degus
 	if path == "":
@@ -841,7 +795,6 @@ func load_map(path: String) -> void:
 		mask_image_texture = ImageTexture.create_from_image(mask_image)
 		drawing_texture.texture = mask_image_texture
 
-		
 		dm_background.texture = InfoDegus
 		player_background.texture = PlayerInfoDegus
 
@@ -850,10 +803,10 @@ func load_map(path: String) -> void:
 
 	else:
 		if not (
-			path.ends_with(".jpg")
-			or path.ends_with(".jpeg")
-			or path.ends_with(".png")
-			or path.ends_with(".map")
+				path.ends_with(".jpg")
+				or path.ends_with(".jpeg")
+				or path.ends_with(".png")
+				or path.ends_with(".map")
 		):
 			warning.title = "Invalid file format"
 			warning.dialog_text = "File must be .jpg, .jpeg, .png or .map"
@@ -887,7 +840,6 @@ func load_map(path: String) -> void:
 			mask_image_texture = ImageTexture.new()
 			mask_image_texture.set_image(mask_image)
 			drawing_texture.texture = mask_image_texture
-
 
 			map_image = Image.new()
 			map_image.load_png_from_buffer(reader.read_file("map.png"))
@@ -931,9 +883,8 @@ func load_map(path: String) -> void:
 				map_image.resize(
 					int(map_image_width * ratio),
 					int(map_image_height * ratio),
-					Image.Interpolation.INTERPOLATE_CUBIC
+					Image.Interpolation.INTERPOLATE_CUBIC,
 				)
-
 
 			get_fog_size(map_image.get_size())
 			mask_image = Image.create(fog_image_width, fog_image_width, false, Image.FORMAT_R8)
@@ -955,7 +906,6 @@ func load_map(path: String) -> void:
 		dm_fog.material.set_shader_parameter("alpha_ceil", 0.5)
 		player_fog.material.set_shader_parameter("alpha_ceil", 1)
 
-
 	drawing_viewport.render_target_clear_mode = SubViewport.CLEAR_MODE_ONCE
 
 	prev_mask = mask_image_texture
@@ -966,10 +916,8 @@ func load_map(path: String) -> void:
 	player_fog.size = Vector2(fog_image_width, fog_image_height)
 	drawing_viewport.size = Vector2(fog_image_width, fog_image_height)
 
-
 	dm_camera.position = Vector2(fog_image_width * 0.5, fog_image_height * 0.5)
 	player_camera.position = Vector2(fog_image_width * 0.5, fog_image_height * 0.5)
-
 
 	move_background(player_root)
 	move_background(dm_root)
@@ -979,7 +927,6 @@ func load_map(path: String) -> void:
 	pretend_to_draw.emit()
 	dm_fog.material.set_shader_parameter("mask_texture", drawing_viewport.get_texture())
 	player_fog.material.set_shader_parameter("mask_texture", drawing_viewport.get_texture())
-
 
 
 func wait_one_frame_and_then_copy() -> void:
@@ -998,12 +945,6 @@ func select_tool(index: int) -> void:
 	current_tool = index
 	tool_changed.emit(index)
 	update_tool_visuals()
-
-
-func _process(_delta: float) -> void:
-	move_player_view()
-	update_cursor_position()
-
 
 
 func move_background(background_node: Node2D) -> void:
@@ -1052,8 +993,9 @@ func write_map(path: String) -> void:
 
 	writer.close()
 
+
 func serialize_tokens(placed_tokens: Array[Dictionary]) -> String:
-	var string : String = ""
+	var string: String = ""
 	for dictionary in placed_tokens:
 		if not is_instance_valid(dictionary['tokens']['dm']):
 			continue
@@ -1073,6 +1015,27 @@ func serialize_tokens(placed_tokens: Array[Dictionary]) -> String:
 		string += "\n"
 
 	return string.trim_suffix("\n")
+
+
+func add_to_undo_list(action: Variant) -> void:
+	undo_list.append(action)
+	if current_file_path == "":
+		return
+	is_dirty = true
+	get_window().title = "DM Window *"
+
+
+func update_colorscheme(id: int) -> void:
+	fog_color_index = id
+	update_fog_texture(FOG_COLOR_LIST[fog_color_index])
+	colorscheme_menu.set_item_checked(id, true)
+
+	for i in range(len(FOG_COLOR_LIST)):
+		colorscheme_menu.set_item_checked(i, i == id)
+
+
+func on_files_dropped(files: PackedStringArray) -> void:
+	print(files)
 
 
 func _on_help_id_pressed(id: int) -> void:
@@ -1096,23 +1059,3 @@ func _on_file_id_pressed(id: int) -> void:
 
 	if id == 2:
 		get_tree().quit()
-
-func add_to_undo_list(action: Variant) -> void:
-	undo_list.append(action)
-	if current_file_path == "":
-		return
-	is_dirty = true
-	get_window().title = "DM Window *"
-
-
-
-func update_colorscheme(id: int) -> void:
-	fog_color_index = id
-	update_fog_texture(FOG_COLOR_LIST[fog_color_index])
-	colorscheme_menu.set_item_checked(id, true)
-
-	for i in range(len(FOG_COLOR_LIST)):
-		colorscheme_menu.set_item_checked(i, i == id)
-
-func on_files_dropped(files: PackedStringArray) -> void:
-	print(files)
