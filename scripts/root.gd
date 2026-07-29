@@ -8,16 +8,15 @@ signal tool_changed(index: int)
 signal selector_finished(start: Vector2, end: Vector2)
 signal pretend_to_draw
 
-enum tool { SQUARE_BRUSH, ROUND_BRUSH, SELECTOR, TOKEN_PLACER, LENGTH }
+enum tool { SQUARE_BRUSH, ROUND_BRUSH, SELECTOR, TOKEN_PLACER, POINTER, LENGTH }
 
 const PerlinTexture = preload("res://resources/Fog.jpg")
 const PlasmaTexture = preload("res://resources/Plasma.jpg")
 
-const CircleIcon = preload("res://resources/CircleIcon.png")
-const SquareIcon = preload("res://resources/SquareIcon.png")
-const SelectorIcon = preload("res://resources/SelectorIcon.png")
 const InfoDegus = preload("res://resources/Info.png")
 const PlayerInfoDegus = preload("res://resources/PlayerInfo.png")
+
+const Pointer = preload("res://resources/PointerIcon.png")
 
 const BRUSH_SIZE_MIN := 5
 const BRUSH_SIZE_MAX := 500
@@ -116,6 +115,8 @@ var stylebox_cursor_normal: StyleBox
 @onready var circle_brush_button: Button = $GUI/ToolContainer/VBoxContainer/CircleBrushButton
 @onready var selector_button: Button = $GUI/ToolContainer/VBoxContainer/SelectorButton
 @onready var token_button: Button = $GUI/ToolContainer/VBoxContainer/TokenButton
+@onready var pointer_button: Button = $GUI/ToolContainer/VBoxContainer/PointerButton
+
 
 # @onready var separator : HSeparator = $GUI/ToolContainer/VBoxContainer/Separator
 @onready var tool_label: Label = $GUI/ToolContainer/VBoxContainer/ToolLabel
@@ -140,6 +141,7 @@ var stylebox_cursor_normal: StyleBox
 @onready var player_fog: TextureRect = $PlayerWindow/PlayerFog
 @onready var player_root: Node2D = $PlayerWindow/PlayerRoot
 @onready var player_background: TextureRect = $PlayerWindow/PlayerRoot/Background
+@onready var player_pointer: Panel = $PlayerWindow/PlayerPointer
 
 @onready var player_view: Panel = $PlayerViewRectangle
 @onready var player_view_text: TextEdit = $PlayerViewRectangle/TextEdit
@@ -165,11 +167,25 @@ func _ready() -> void:
 	circle_brush_button.connect("pressed", func() -> void: select_tool(tool.ROUND_BRUSH))
 	selector_button.connect("pressed", func() -> void: select_tool(tool.SELECTOR))
 	token_button.connect("pressed", func() -> void: select_tool(tool.TOKEN_PLACER))
+	pointer_button.connect("pressed", func() -> void: select_tool(tool.POINTER))
 
 	square_brush_button.connect("mouse_exited", square_brush_button.release_focus)
 	circle_brush_button.connect("mouse_exited", circle_brush_button.release_focus)
 	selector_button.connect("mouse_exited", selector_button.release_focus)
 	token_button.connect("mouse_exited", token_button.release_focus)
+	pointer_button.connect("mouse_exited", pointer_button.release_focus)
+
+	square_brush_button.connect("mouse_entered", func() -> void: tool_label.text = "Square Brush")
+	circle_brush_button.connect("mouse_entered", func() -> void: tool_label.text = "Round Brush")
+	selector_button.connect("mouse_entered", func() -> void: tool_label.text = "Selector")
+	token_button.connect("mouse_entered", func() -> void: tool_label.text = "Token Placer")
+	pointer_button.connect("mouse_entered", func() -> void: tool_label.text = "Pointer")
+
+	square_brush_button.connect("mouse_exited", func() -> void: update_tool_visuals())
+	circle_brush_button.connect("mouse_exited", func() -> void: update_tool_visuals())
+	selector_button.connect("mouse_exited", func() -> void: update_tool_visuals())
+	token_button.connect("mouse_exited", func() -> void: update_tool_visuals())
+	pointer_button.connect("mouse_exited", func() -> void: update_tool_visuals())
 
 	stylebox_button_pressed = selector_button.get_theme_stylebox("normal").duplicate()
 	stylebox_button_pressed.border_width_left = 2
@@ -211,6 +227,7 @@ func _ready() -> void:
 		circle_brush_button,
 		selector_button,
 		token_button,
+		pointer_button,
 		color_picker_container,
 	]
 	for i in range(len(gui_list)):
@@ -225,10 +242,16 @@ func _ready() -> void:
 		circle_brush_button,
 		selector_button,
 		token_button,
+		pointer_button,
 		color_picker_container,
 	]
 
 	populate_color_bar()
+
+	var stylebox_cursor: StyleBox = player_pointer.get_theme_stylebox("panel").duplicate()
+	stylebox_cursor.bg_color = Color.RED
+	stylebox_cursor.border_color = Color.RED
+	player_pointer.add_theme_stylebox_override("panel", stylebox_cursor)
 
 	for i in range(len(sidebar_list)):
 		sidebar_list[i].connect("mouse_entered", are_we_inside_sidebar)
@@ -274,7 +297,6 @@ func populate_color_bar() -> void:
 		color_button.connect("mouse_entered", are_we_inside_sidebar)
 		color_button.connect("mouse_exited", func() -> void: in_sidebar = false)
 		color_button.connect("pressed", func() -> void:
-			print("Color button pressed: %d" % i)
 			token_color_index = i
 			update_tool_visuals()
 		)
@@ -283,8 +305,9 @@ func populate_color_bar() -> void:
 
 
 func update_cursor_position() -> void:
-	if hovering_over_menu:
+	if hovering_over_menu or hovering_over_gui:
 		cursor_node.visible = false
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	if current_tool != tool.SELECTOR:
 		if in_sidebar:
 			cursor_node.position = dm_camera.position - Vector2.ONE * brush_size / 2
@@ -296,6 +319,10 @@ func update_cursor_position() -> void:
 
 func _input(event: InputEvent) -> void:
 	update_cursor_position()
+
+	if event is InputEventMouseMotion and current_tool == tool.POINTER:
+		player_pointer.position = get_global_mouse_position() - player_pointer.size / 2
+
 
 	if event is InputEventKey:
 		process_keypresses(event)
@@ -465,6 +492,9 @@ func process_keypresses(event: InputEventKey) -> void:
 			KEY_4:
 				select_tool(tool.TOKEN_PLACER)
 
+			KEY_5:
+				select_tool(tool.POINTER)
+
 			KEY_C:
 				token_color_index = (token_color_index + 1) % len(TOKEN_COLOR_LIST)
 				update_tool_visuals()
@@ -553,7 +583,7 @@ func undo() -> void:
 			payload['tokens']['player'].get_child(0).text = payload['number']
 
 
-func make_token(pos: Vector2 = Vector2.INF, text: String = "", size: int = -1, color_id: int = -1) -> Dictionary[String, Panel]:
+func make_token(pos: Vector2 = Vector2.INF, text: String = "", token_size_temp: int = -1, color_id: int = -1) -> Dictionary[String, Panel]:
 	var token_dict: Dictionary[String, Panel] = {}
 
 	var token_pos : Vector2
@@ -562,7 +592,7 @@ func make_token(pos: Vector2 = Vector2.INF, text: String = "", size: int = -1, c
 	else:
 		token_pos = pos
 
-	var token_size: int = brush_size if size == -1 else size
+	var token_size: int = brush_size if token_size_temp == -1 else token_size_temp
 	var token_color_id: int = token_color_index if color_id == -1 else color_id
 	var token_text: String = "1" if text == "" else text
 
@@ -666,7 +696,7 @@ func reshape_selector_cursor_panel() -> void:
 
 func update_tool_visuals() -> void:
 	var button_list: Array = [
-		square_brush_button, circle_brush_button, selector_button, token_button
+		square_brush_button, circle_brush_button, selector_button, token_button, pointer_button,
 	]
 
 	# make all buttons unpressed
@@ -675,13 +705,15 @@ func update_tool_visuals() -> void:
 
 	scroll_sidebar.visible = true
 	cursor_panel.visible = true
+	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	player_pointer.visible = false
 
 	scrollbar.set_value_no_signal(last_brush_size)
 	brush_size = last_brush_size
 	brush_size_changed.emit(brush_size)
 	scrollbar_label.text = str(int(brush_size))
 	color_picker_container.visible = current_tool == tool.TOKEN_PLACER
-	scroll_sidebar.visible = current_tool != tool.SELECTOR
+	scroll_sidebar.visible = (current_tool != tool.SELECTOR) and (current_tool != tool.POINTER)
 
 	match current_tool:
 		tool.SQUARE_BRUSH:
@@ -689,7 +721,7 @@ func update_tool_visuals() -> void:
 			cursor_panel.add_theme_stylebox_override("panel", stylebox_cursor_normal)
 
 			square_brush_button.add_theme_stylebox_override("normal", stylebox_button_pressed)
-			tool_label.text = "Square brush"
+			tool_label.text = "Square Brush"
 
 		tool.ROUND_BRUSH:
 			var stylebox_cursor: StyleBox = cursor_panel.get_theme_stylebox("panel").duplicate()
@@ -725,7 +757,22 @@ func update_tool_visuals() -> void:
 
 			token_button.add_theme_stylebox_override("normal", stylebox_button_pressed)
 
-			tool_label.text = "Token"
+			tool_label.text = "Token Placer"
+
+		tool.POINTER:
+			var stylebox_cursor: StyleBox = cursor_panel.get_theme_stylebox("panel").duplicate()
+			Input.set_mouse_mode(Input.MOUSE_MODE_HIDDEN)
+			player_pointer.visible = true
+
+			stylebox_cursor = update_circular_stylebox(stylebox_cursor)
+			stylebox_cursor.bg_color = Color.RED
+			stylebox_cursor.border_color = Color.RED
+			cursor_panel.add_theme_stylebox_override("panel", stylebox_cursor)
+
+			brush_size = 10
+			pointer_button.add_theme_stylebox_override("normal", stylebox_button_pressed)
+
+			tool_label.text = "Pointer"
 
 	cursor_panel.size = Vector2(brush_size, brush_size)
 
