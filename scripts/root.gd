@@ -35,9 +35,9 @@ const TOKEN_COLOR_LIST: Array = [
 	[Color.GREEN, Color.DARK_GREEN, Color.WHITE],
 	[Color.RED, Color.DARK_RED, Color.WHITE],
 	[Color.BLUE, Color.DARK_BLUE, Color.WHITE],
-	[Color.LIGHT_YELLOW, Color.YELLOW, Color.BLACK],
-	[Color.BLACK, Color.GRAY, Color.WHITE],
-	[Color.WHITE, Color.GRAY, Color.BLACK],
+	[Color.YELLOW, Color.GOLD, Color.BLACK],
+	[Color.BLACK, Color.WHITE, Color.WHITE],
+	[Color.WHITE, Color.BLACK, Color.BLACK],
 ]
 
 
@@ -232,15 +232,10 @@ func _process(_delta: float) -> void:
 
 
 func _input(event: InputEvent) -> void:
-	update_cursor_position()
-
-	if event is InputEventMouseMotion and current_tool == tool.POINTER:
-		player_pointer.position = get_global_mouse_position() - player_pointer.size / 2
-
 	if event is InputEventKey:
 		process_keypresses(event)
 
-	if event is InputEventMouseButton:
+	elif event is InputEventMouseButton:
 		on_mouse_pos_changed.emit(get_global_mouse_position())
 
 		# dont process clicks when over gui, but process releases
@@ -345,6 +340,9 @@ func _input(event: InputEvent) -> void:
 
 	elif event is InputEventMouseMotion:
 		on_mouse_pos_changed.emit(get_global_mouse_position())
+
+		if current_tool == tool.POINTER:
+			player_pointer.position = get_global_mouse_position() - player_pointer.size / 2
 
 		if m1_held or m2_held:
 			drawing_texture.visible = false
