@@ -242,34 +242,6 @@ func _input(event: InputEvent) -> void:
 		if (hovering_over_menu or hovering_over_sidebar) and event.pressed:
 			return
 
-		if not hovered_tokens.is_empty() and event.pressed:
-			if event.button_index == MOUSE_BUTTON_LEFT:
-				add_to_undo_list(["move_token", { 'tokens': hovered_tokens, 'position': hovered_tokens['dm'].position }])
-				is_dirty = true
-				if len(undo_list) > UNDO_LIST_MAX_ALL:
-					undo_list.pop_front()
-				held_tokens = hovered_tokens
-				held_tokens['dm'].mouse_default_cursor_shape = CursorShape.CURSOR_MOVE
-
-			if event.button_index == MOUSE_BUTTON_RIGHT:
-				var dm_token: Panel = hovered_tokens['dm']
-				var player_token: Panel = hovered_tokens['player']
-				dm_token.visible = false
-				player_token.visible = false
-				add_to_undo_list(["remove_token", { 'tokens': { 'dm': dm_token, 'player': player_token } }])
-				is_dirty = true
-				if len(undo_list) > UNDO_LIST_MAX_ALL:
-					undo_list.pop_front()
-
-				hovered_tokens = { }
-				return
-
-		if not held_tokens.is_empty():
-			if event.button_index == MOUSE_BUTTON_LEFT:
-				if not event.pressed:
-					held_tokens['dm'].mouse_default_cursor_shape = CursorShape.CURSOR_POINTING_HAND
-					held_tokens = { }
-			return
 
 		match current_tool:
 			tool.TOKEN_PLACER:
@@ -284,6 +256,36 @@ func _input(event: InputEvent) -> void:
 							is_dirty = true
 							if len(undo_list) > UNDO_LIST_MAX_ALL:
 								undo_list.pop_front()
+
+				if not hovered_tokens.is_empty() and event.pressed:
+					if event.button_index == MOUSE_BUTTON_LEFT:
+						add_to_undo_list(["move_token", { 'tokens': hovered_tokens, 'position': hovered_tokens['dm'].position }])
+						is_dirty = true
+						if len(undo_list) > UNDO_LIST_MAX_ALL:
+							undo_list.pop_front()
+						held_tokens = hovered_tokens
+						held_tokens['dm'].mouse_default_cursor_shape = CursorShape.CURSOR_MOVE
+
+					if event.button_index == MOUSE_BUTTON_RIGHT:
+						var dm_token: Panel = hovered_tokens['dm']
+						var player_token: Panel = hovered_tokens['player']
+						dm_token.visible = false
+						player_token.visible = false
+						add_to_undo_list(["remove_token", { 'tokens': { 'dm': dm_token, 'player': player_token } }])
+						is_dirty = true
+						if len(undo_list) > UNDO_LIST_MAX_ALL:
+							undo_list.pop_front()
+
+						hovered_tokens = { }
+						return
+
+				if not held_tokens.is_empty():
+					if event.button_index == MOUSE_BUTTON_LEFT:
+						if not event.pressed:
+							held_tokens['dm'].mouse_default_cursor_shape = CursorShape.CURSOR_POINTING_HAND
+							held_tokens = { }
+					return
+
 			tool.SELECTOR:
 				if (
 						event.button_index == MOUSE_BUTTON_LEFT
@@ -329,6 +331,7 @@ func _input(event: InputEvent) -> void:
 					set_cursor_shape(CursorShape.CURSOR_DRAG)
 				else:
 					update_tool_visuals()
+
 			MOUSE_BUTTON_WHEEL_UP:
 				if ctrl_held:
 					update_brush_size(min(max(BRUSH_SIZE_MIN, brush_size - 5), BRUSH_SIZE_MAX))
@@ -341,31 +344,25 @@ func _input(event: InputEvent) -> void:
 	elif event is InputEventMouseMotion:
 		on_mouse_pos_changed.emit(get_global_mouse_position())
 
-		if current_tool == tool.POINTER:
-			player_pointer.position = get_global_mouse_position() - player_pointer.size / 2
-
 		if m1_held or m2_held:
 			drawing_texture.visible = false
 
-		if not held_tokens.is_empty():
-			held_tokens['dm'].position = get_global_mouse_position() - Vector2.ONE * held_tokens['dm'].size / 2
-			held_tokens['player'].position = get_global_mouse_position() - Vector2.ONE * held_tokens['player'].size / 2
+		match current_tool:
+			tool.POINTER:
+				player_pointer.position = get_global_mouse_position() - player_pointer.size / 2
 
-		if hovered_tokens.is_empty():
-			cursor_node.visible = true
-			match current_tool:
-				tool.SQUARE_BRUSH:
-					set_cursor_shape(CursorShape.CURSOR_CROSS)
-				tool.ROUND_BRUSH:
-					set_cursor_shape(CursorShape.CURSOR_CROSS)
-				tool.SELECTOR:
-					set_cursor_shape(CursorShape.CURSOR_ARROW)
-				tool.TOKEN_PLACER:
+			tool.TOKEN_PLACER:
+				if not held_tokens.is_empty():
+					held_tokens['dm'].position = get_global_mouse_position() - Vector2.ONE * held_tokens['dm'].size / 2
+					held_tokens['player'].position = get_global_mouse_position() - Vector2.ONE * held_tokens['player'].size / 2
+
+				if hovered_tokens.is_empty():
+					cursor_node.visible = true
+					set_cursor_shape()
+
+				elif not m1_held and not m2_held:
+					cursor_node.visible = false
 					set_cursor_shape(CursorShape.CURSOR_POINTING_HAND)
-		else:
-			if not m1_held and not m2_held:
-				cursor_node.visible = false
-				set_cursor_shape(CursorShape.CURSOR_POINTING_HAND)
 
 
 func populate_color_bar() -> void:
@@ -419,15 +416,16 @@ func process_keypresses(event: InputEventKey) -> void:
 		ctrl_held = event.pressed
 
 	if event.pressed:
-		if not hovered_tokens.is_empty() and event.keycode in range(KEY_0, KEY_9 + 1):
-			var previous_number: String = hovered_tokens['dm'].get_child(0).text
-			add_to_undo_list(['change_number', { 'tokens': hovered_tokens, 'number': previous_number }])
+		if (not hovered_tokens.is_empty() or not held_tokens.is_empty()) and event.keycode in range(KEY_0, KEY_9 + 1):
+			var active_tokens := held_tokens if not held_tokens.is_empty() else hovered_tokens
+			var previous_number: String = active_tokens['dm'].get_child(0).text
+			add_to_undo_list(['change_number', { 'tokens': active_tokens, 'number': previous_number }])
 			is_dirty = true
 			if len(undo_list) > UNDO_LIST_MAX_ALL:
 				undo_list.pop_front()
 			var number := str(event.keycode - KEY_0)
-			hovered_tokens['dm'].get_child(0).text = number
-			hovered_tokens['player'].get_child(0).text = number
+			active_tokens['dm'].get_child(0).text = number
+			active_tokens['player'].get_child(0).text = number
 			return
 
 		match event.keycode:
@@ -547,6 +545,7 @@ func make_token(pos: Vector2 = Vector2.INF, text: String = "", token_size_temp: 
 
 		token.add_child(label)
 
+		# token.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		token.size = Vector2(token_size, token_size)
 		token.position = token_pos
 		token.z_index = -1
@@ -561,7 +560,7 @@ func make_token(pos: Vector2 = Vector2.INF, text: String = "", token_size_temp: 
 		stylebox_cursor.border_color = TOKEN_COLOR_LIST[token_color_id][1]
 		token.add_theme_stylebox_override("panel", stylebox_cursor)
 
-		token.mouse_default_cursor_shape = CursorShape.CURSOR_POINTING_HAND
+		# token.mouse_default_cursor_shape = CursorShape.CURSOR_POINTING_HAND
 
 		if i == 0:
 			add_child(token)
@@ -637,8 +636,6 @@ func update_tool_visuals() -> void:
 		button_list[i][0].add_theme_stylebox_override("normal", stylebox_button_not_pressed)
 
 	cursor_panel.visible = true
-	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-	player_pointer.visible = current_tool == tool.POINTER
 
 	tool_label.text = button_list[current_tool][1]
 
@@ -646,8 +643,11 @@ func update_tool_visuals() -> void:
 	brush_size = last_brush_size
 	brush_size_changed.emit(brush_size)
 	scrollbar_label.text = str(int(brush_size))
+
 	color_picker_container.visible = current_tool == tool.TOKEN_PLACER
 	scroll_sidebar.visible = (current_tool != tool.SELECTOR) and (current_tool != tool.POINTER)
+	player_pointer.visible = current_tool == tool.POINTER
+	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if current_tool != tool.POINTER else Input.MOUSE_MODE_HIDDEN)
 
 	match current_tool:
 		tool.SQUARE_BRUSH:
@@ -672,7 +672,7 @@ func update_tool_visuals() -> void:
 			reshape_selector_cursor_panel()
 		tool.TOKEN_PLACER:
 			var stylebox_cursor: StyleBox = cursor_panel.get_theme_stylebox("panel").duplicate()
-			set_cursor_shape(CursorShape.CURSOR_POINTING_HAND)
+			set_cursor_shape()
 
 			scrollbar.set_value_no_signal(last_token_size)
 			brush_size = last_token_size
@@ -687,7 +687,6 @@ func update_tool_visuals() -> void:
 
 		tool.POINTER:
 			var stylebox_cursor: StyleBox = cursor_panel.get_theme_stylebox("panel").duplicate()
-			Input.set_mouse_mode(Input.MOUSE_MODE_HIDDEN)
 			player_pointer.visible = true
 
 			stylebox_cursor = update_circular_stylebox(stylebox_cursor)
@@ -920,6 +919,16 @@ func select_tool(index: int) -> void:
 	tool_changed.emit(index)
 	update_tool_visuals()
 
+	# make all tokens mouse filter ignore if not in token placer
+	for dictionary in all_placed_tokens:
+		if is_instance_valid(dictionary['tokens']['dm']):
+			if current_tool != tool.TOKEN_PLACER:
+				# make all tokens mouse filter ignore
+				dictionary['tokens']['dm'].mouse_filter = Control.MOUSE_FILTER_IGNORE
+			else:
+				# make all tokens mouse filter stop
+				dictionary['tokens']['dm'].mouse_filter = Control.MOUSE_FILTER_STOP
+
 
 func move_background(background_node: Node2D) -> void:
 	var map_image_width: int
@@ -1005,6 +1014,8 @@ func debug() -> void:
 	text += "hovering_over_menu: %s\n" % hovering_over_menu
 	text += "m1_held: %s\n" % m1_held
 	text += "m2_held: %s\n" % m2_held
+	text += "held_tokens: %s\n" % held_tokens
+	text += "hovered_tokens: %s\n" % hovered_tokens
 
 	debug_text.text = text
 
