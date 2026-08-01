@@ -32,13 +32,14 @@ const FOG_COLOR_LIST: Array = [
 	Color.LIME,
 ]
 const TOKEN_COLOR_LIST: Array = [
-	[Color.GREEN, Color.DARK_GREEN],
-	[Color.RED, Color.DARK_RED],
-	[Color.BLUE, Color.DARK_BLUE],
-	[Color.YELLOW, Color.DARK_ORANGE],
-	[Color.BLACK, Color.GRAY],
-	[Color.WHITE, Color.GRAY],
+	[Color.GREEN, Color.DARK_GREEN, Color.WHITE],
+	[Color.RED, Color.DARK_RED, Color.WHITE],
+	[Color.BLUE, Color.DARK_BLUE, Color.WHITE],
+	[Color.LIGHT_YELLOW, Color.YELLOW, Color.BLACK],
+	[Color.BLACK, Color.GRAY, Color.WHITE],
+	[Color.WHITE, Color.GRAY, Color.BLACK],
 ]
+
 
 var current_tool: int = 0
 var fog_color_index: int = 0
@@ -52,10 +53,9 @@ var ctrl_held := false
 var m1_held := false
 var m2_held := false
 var selecting := false
-var hovering_over_gui := false
 var hovering_over_menu := false
 var performance_mode := false
-var in_sidebar := false
+var hovering_over_sidebar := false
 var is_dirty := false
 var prev_mask: Texture2D
 var undo_list: Array = []
@@ -76,7 +76,9 @@ var held_tokens: Dictionary[String, Panel] = { }
 var stylebox_button_pressed: StyleBox
 var stylebox_button_not_pressed: StyleBox
 var stylebox_cursor_normal: StyleBox
+var button_list: Array
 
+@onready var debug_text: TextEdit = $GUI/TextEdit
 @onready var menu_bar: MenuBar = $GUI/MenuBar
 @onready var file_menu: PopupMenu = $GUI/MenuBar/File
 @onready var help_menu: PopupMenu = $GUI/MenuBar/Help
@@ -88,7 +90,7 @@ var stylebox_cursor_normal: StyleBox
 @onready var scrollbar: VScrollBar = $GUI/ScrollBarContainer/VBoxContainer/VScrollBar
 @onready var scrollbar_label: Label = $GUI/ScrollBarContainer/VBoxContainer/Label
 @onready var square_brush_button: Button = $GUI/ToolContainer/VBoxContainer/SquareBrushButton
-@onready var circle_brush_button: Button = $GUI/ToolContainer/VBoxContainer/CircleBrushButton
+@onready var round_brush_button: Button = $GUI/ToolContainer/VBoxContainer/CircleBrushButton
 @onready var selector_button: Button = $GUI/ToolContainer/VBoxContainer/SelectorButton
 @onready var token_button: Button = $GUI/ToolContainer/VBoxContainer/TokenButton
 @onready var pointer_button: Button = $GUI/ToolContainer/VBoxContainer/PointerButton
@@ -116,46 +118,48 @@ var stylebox_cursor_normal: StyleBox
 @onready var player_view_text: TextEdit = $PlayerViewRectangle/TextEdit
 
 
+
 func _ready() -> void:
+	button_list = [
+		[square_brush_button, "Square Brush"],
+		[round_brush_button, "Round Brush"],
+		[selector_button, "Selector"],
+		[token_button, "Token Placer"],
+		[pointer_button, "Pointer"],
+	]
+
+	make_button_styleboxes()
+	connect_signals()
+	make_pointer_red()
+	populate_color_bar()
+
+	scrollbar.set_value_no_signal(brush_size)
+
+	select_tool(tool.SQUARE_BRUSH)
+
+	load_dialog.add_filter("*.png, *.jpg, *.jpeg, *.map", "Images / .map files")
+	save_dialog.add_filter("*.map", ".map files")
+	update_brush_size(brush_size)
+
+	cursor_panel.size = Vector2(brush_size, brush_size)
+
 	get_window().title = "DM Window"
+	var args: Array = OS.get_cmdline_args()
 
-	get_window().files_dropped.connect(func(paths: PackedStringArray) -> void: load_map(paths[0]))
+	if len(args) > 0:
+		load_map(args[0])
+	else:
+		load_map("")
 
-	load_dialog.connect("file_selected", func(path: String) -> void: load_map(path))
-	save_dialog.connect("file_selected", func(path: String) -> void: write_map(path))
-	scrollbar.connect("value_changed", update_brush_size)
 
-	# player_camera.connect("on_mouse_pos_changed", func(_pos: Vector2) -> void: move_player_view())
-	# dm_camera.connect("on_mouse_pos_changed", func(pos: Vector2) -> void: update_cursor_position())
+func make_pointer_red() -> void:
+	var stylebox_cursor: StyleBox = player_pointer.get_theme_stylebox("panel").duplicate()
+	stylebox_cursor.bg_color = Color.RED
+	stylebox_cursor.border_color = Color.RED
+	player_pointer.add_theme_stylebox_override("panel", stylebox_cursor)
 
-	file_menu.connect("id_pressed", _on_file_id_pressed)
-	help_menu.connect("id_pressed", _on_help_id_pressed)
-	colorscheme_menu.connect("id_pressed", update_colorscheme)
 
-	square_brush_button.connect("pressed", func() -> void: select_tool(tool.SQUARE_BRUSH))
-	circle_brush_button.connect("pressed", func() -> void: select_tool(tool.ROUND_BRUSH))
-	selector_button.connect("pressed", func() -> void: select_tool(tool.SELECTOR))
-	token_button.connect("pressed", func() -> void: select_tool(tool.TOKEN_PLACER))
-	pointer_button.connect("pressed", func() -> void: select_tool(tool.POINTER))
-
-	square_brush_button.connect("mouse_exited", square_brush_button.release_focus)
-	circle_brush_button.connect("mouse_exited", circle_brush_button.release_focus)
-	selector_button.connect("mouse_exited", selector_button.release_focus)
-	token_button.connect("mouse_exited", token_button.release_focus)
-	pointer_button.connect("mouse_exited", pointer_button.release_focus)
-
-	square_brush_button.connect("mouse_entered", func() -> void: tool_label.text = "Square Brush")
-	circle_brush_button.connect("mouse_entered", func() -> void: tool_label.text = "Round Brush")
-	selector_button.connect("mouse_entered", func() -> void: tool_label.text = "Selector")
-	token_button.connect("mouse_entered", func() -> void: tool_label.text = "Token Placer")
-	pointer_button.connect("mouse_entered", func() -> void: tool_label.text = "Pointer")
-
-	square_brush_button.connect("mouse_exited", func() -> void: update_tool_visuals())
-	circle_brush_button.connect("mouse_exited", func() -> void: update_tool_visuals())
-	selector_button.connect("mouse_exited", func() -> void: update_tool_visuals())
-	token_button.connect("mouse_exited", func() -> void: update_tool_visuals())
-	pointer_button.connect("mouse_exited", func() -> void: update_tool_visuals())
-
+func make_button_styleboxes() -> void:
 	stylebox_button_pressed = selector_button.get_theme_stylebox("normal").duplicate()
 	stylebox_button_pressed.border_width_left = 2
 	stylebox_button_pressed.border_width_right = 2
@@ -176,71 +180,53 @@ func _ready() -> void:
 	stylebox_cursor_normal.bg_color = Color.TRANSPARENT
 	stylebox_cursor_normal.border_color = Color.BLACK
 
-	scrollbar.set_value_no_signal(brush_size)
 
+func connect_signals() -> void:
+	get_window().files_dropped.connect(func(paths: PackedStringArray) -> void: load_map(paths[0]))
+
+	load_dialog.connect("file_selected", func(path: String) -> void: load_map(path))
+	save_dialog.connect("file_selected", func(path: String) -> void: write_map(path))
+	scrollbar.connect("value_changed", update_brush_size)
+
+	file_menu.connect("id_pressed", _on_file_id_pressed)
+	help_menu.connect("id_pressed", _on_help_id_pressed)
+	colorscheme_menu.connect("id_pressed", update_colorscheme)
+
+
+	for i in range(len(button_list)):
+		var button: Button = button_list[i][0]
+		var tool_name: String = button_list[i][1]
+
+		button.connect("pressed", func() -> void: select_tool(i))
+		button.connect("mouse_entered", func() -> void: tool_label.text = tool_name)
+		button.connect("mouse_exited", func() -> void:
+			update_tool_visuals()
+			button.release_focus()
+		)
 	drawing_node.connect("on_finished_drawing", wait_one_frame_and_then_copy)
-
-	update_tool_visuals()
-	select_tool(tool.SQUARE_BRUSH)
 
 	menu_bar.connect("mouse_entered", func() -> void: hovering_over_menu = true)
 	menu_bar.connect("mouse_exited", func() -> void: hovering_over_menu = false)
-
-	var gui_list: Array = [
-		menu_bar,
-		file_menu,
-		colorscheme_menu,
-		tool_sidebar,
-		scrollbar,
-		square_brush_button,
-		circle_brush_button,
-		selector_button,
-		token_button,
-		pointer_button,
-		color_picker_container,
-	]
-	for i in range(len(gui_list)):
-		gui_list[i].connect("mouse_entered", func() -> void: hovering_over_gui = true)
-		gui_list[i].connect("mouse_exited", func() -> void: hovering_over_gui = false)
 
 	var sidebar_list: Array = [
 		tool_sidebar,
 		scroll_sidebar,
 		scrollbar,
 		square_brush_button,
-		circle_brush_button,
+		round_brush_button,
 		selector_button,
 		token_button,
 		pointer_button,
 		color_picker_container,
 	]
 
-	populate_color_bar()
-
-	var stylebox_cursor: StyleBox = player_pointer.get_theme_stylebox("panel").duplicate()
-	stylebox_cursor.bg_color = Color.RED
-	stylebox_cursor.border_color = Color.RED
-	player_pointer.add_theme_stylebox_override("panel", stylebox_cursor)
-
 	for i in range(len(sidebar_list)):
 		sidebar_list[i].connect("mouse_entered", are_we_inside_sidebar)
-		sidebar_list[i].connect("mouse_exited", func() -> void: in_sidebar = false)
-
-	load_dialog.add_filter("*.png, *.jpg, *.jpeg, *.map", "Images / .map files")
-	save_dialog.add_filter("*.map", ".map files")
-	update_brush_size(brush_size)
-
-	cursor_panel.size = Vector2(brush_size, brush_size)
-
-	var args: Array = OS.get_cmdline_args()
-
-	if len(args) > 0:
-		load_map(args[0])
-	else:
-		load_map("")
+		sidebar_list[i].connect("mouse_exited", func() -> void: hovering_over_sidebar = false)
 
 
 func _process(_delta: float) -> void:
+	debug()
 	move_player_view()
 	update_cursor_position()
 
@@ -258,7 +244,7 @@ func _input(event: InputEvent) -> void:
 		on_mouse_pos_changed.emit(get_global_mouse_position())
 
 		# dont process clicks when over gui, but process releases
-		if hovering_over_gui and event.pressed:
+		if (hovering_over_menu or hovering_over_sidebar) and event.pressed:
 			return
 
 		if not hovered_tokens.is_empty() and event.pressed:
@@ -404,10 +390,10 @@ func populate_color_bar() -> void:
 		color_button.add_theme_font_size_override("font_size", 24)
 		color_button.add_theme_color_override("font_color_shadow", TOKEN_COLOR_LIST[i][1])
 		color_button.text = "●"
-		color_button.connect("mouse_entered", func() -> void: hovering_over_gui = true)
-		color_button.connect("mouse_exited", func() -> void: hovering_over_gui = false)
+		color_button.connect("mouse_entered", func() -> void: hovering_over_sidebar = true)
+		color_button.connect("mouse_exited", func() -> void: hovering_over_sidebar = false)
 		color_button.connect("mouse_entered", are_we_inside_sidebar)
-		color_button.connect("mouse_exited", func() -> void: in_sidebar = false)
+		color_button.connect("mouse_exited", func() -> void: hovering_over_sidebar = false)
 		color_button.connect(
 			"pressed",
 			func() -> void:
@@ -418,11 +404,11 @@ func populate_color_bar() -> void:
 
 
 func update_cursor_position() -> void:
-	if hovering_over_menu or hovering_over_gui:
+	if hovering_over_menu or hovering_over_sidebar:
 		cursor_node.visible = false
 		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 	if current_tool != tool.SELECTOR:
-		if in_sidebar:
+		if hovering_over_sidebar:
 			cursor_node.position = dm_camera.position - Vector2.ONE * brush_size / 2
 		else:
 			cursor_node.position = get_global_mouse_position() - Vector2.ONE * brush_size / 2
@@ -554,6 +540,9 @@ func make_token(pos: Vector2 = Vector2.INF, text: String = "", token_size_temp: 
 
 		label.text = token_text
 		label.set("theme_override_font_sizes/font_size", token_size / 2)
+		# set the color of the label text
+		label.add_theme_color_override("font_color", TOKEN_COLOR_LIST[token_color_id][2])
+
 		label.size = Vector2(token_size, token_size)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -645,22 +634,15 @@ func reshape_selector_cursor_panel() -> void:
 
 
 func update_tool_visuals() -> void:
-	var button_list: Array = [
-		square_brush_button,
-		circle_brush_button,
-		selector_button,
-		token_button,
-		pointer_button,
-	]
-
 	# make all buttons unpressed
 	for i in range(len(button_list)):
-		button_list[i].add_theme_stylebox_override("normal", stylebox_button_not_pressed)
+		button_list[i][0].add_theme_stylebox_override("normal", stylebox_button_not_pressed)
 
-	scroll_sidebar.visible = true
 	cursor_panel.visible = true
 	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-	player_pointer.visible = false
+	player_pointer.visible = current_tool == tool.POINTER
+
+	tool_label.text = button_list[current_tool][1]
 
 	scrollbar.set_value_no_signal(last_brush_size)
 	brush_size = last_brush_size
@@ -675,7 +657,6 @@ func update_tool_visuals() -> void:
 			cursor_panel.add_theme_stylebox_override("panel", stylebox_cursor_normal)
 
 			square_brush_button.add_theme_stylebox_override("normal", stylebox_button_pressed)
-			tool_label.text = "Square Brush"
 		tool.ROUND_BRUSH:
 			var stylebox_cursor: StyleBox = cursor_panel.get_theme_stylebox("panel").duplicate()
 			set_cursor_shape(CursorShape.CURSOR_CROSS)
@@ -684,15 +665,13 @@ func update_tool_visuals() -> void:
 			stylebox_cursor.border_color = Color.BLACK
 			cursor_panel.add_theme_stylebox_override("panel", stylebox_cursor)
 
-			circle_brush_button.add_theme_stylebox_override("normal", stylebox_button_pressed)
-			tool_label.text = "Round Brush"
+			round_brush_button.add_theme_stylebox_override("normal", stylebox_button_pressed)
 		tool.SELECTOR:
 			set_cursor_shape()
 			cursor_panel.add_theme_stylebox_override("panel", stylebox_cursor_normal)
 
 			selector_button.add_theme_stylebox_override("normal", stylebox_button_pressed)
 			reshape_selector_cursor_panel()
-			tool_label.text = "Selector"
 		tool.TOKEN_PLACER:
 			var stylebox_cursor: StyleBox = cursor_panel.get_theme_stylebox("panel").duplicate()
 			set_cursor_shape(CursorShape.CURSOR_POINTING_HAND)
@@ -708,7 +687,6 @@ func update_tool_visuals() -> void:
 
 			token_button.add_theme_stylebox_override("normal", stylebox_button_pressed)
 
-			tool_label.text = "Token Placer"
 		tool.POINTER:
 			var stylebox_cursor: StyleBox = cursor_panel.get_theme_stylebox("panel").duplicate()
 			Input.set_mouse_mode(Input.MOUSE_MODE_HIDDEN)
@@ -722,11 +700,7 @@ func update_tool_visuals() -> void:
 			brush_size = 10
 			pointer_button.add_theme_stylebox_override("normal", stylebox_button_pressed)
 
-			tool_label.text = "Pointer"
-
 	cursor_panel.size = Vector2(brush_size, brush_size)
-
-	update_cursor_position()
 
 
 func update_circular_stylebox(stylebox: StyleBox) -> StyleBox:
@@ -813,6 +787,7 @@ func load_map(path: String) -> void:
 			warning.popup_centered()
 			return
 
+		# clear previous session
 		undo_list = []
 
 		for dictionary in all_placed_tokens:
@@ -822,6 +797,7 @@ func load_map(path: String) -> void:
 
 		all_placed_tokens = []
 
+		# load the .map file
 		if path.ends_with(".map"):
 			# .map is just a renamed zip with two images and a json in it
 			var reader: ZIPReader = ZIPReader.new()
@@ -938,7 +914,7 @@ func are_we_inside_sidebar() -> void:
 	if m1_held or m2_held:
 		return
 	else:
-		in_sidebar = true
+		hovering_over_sidebar = true
 
 
 func select_tool(index: int) -> void:
@@ -1023,6 +999,17 @@ func add_to_undo_list(action: Variant) -> void:
 		return
 	is_dirty = true
 	get_window().title = "DM Window *"
+
+func debug() -> void:
+	var text := "Current tool: %s\n" % current_tool
+	text += "Token color index: %s\n" % token_color_index
+	text += "hovering_over_sidebar: %s\n" % hovering_over_sidebar
+	text += "hovering_over_menu: %s\n" % hovering_over_menu
+	text += "m1_held: %s\n" % m1_held
+	text += "m2_held: %s\n" % m2_held
+
+	debug_text.text = text
+
 
 
 func update_colorscheme(id: int) -> void:
