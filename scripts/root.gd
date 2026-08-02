@@ -120,6 +120,7 @@ var button_list: Array
 
 
 func _ready() -> void:
+	debug_text.visible = false
 	button_list = [
 		[square_brush_button, "Square Brush"],
 		[round_brush_button, "Round Brush"],
@@ -347,6 +348,10 @@ func _input(event: InputEvent) -> void:
 		if m1_held or m2_held:
 			drawing_texture.visible = false
 
+		if hovered_tokens.is_empty():
+			cursor_node.visible = true
+			set_cursor_shape()
+
 		match current_tool:
 			tool.POINTER:
 				player_pointer.position = get_global_mouse_position() - player_pointer.size / 2
@@ -402,6 +407,7 @@ func update_cursor_position() -> void:
 	if hovering_over_menu or hovering_over_sidebar:
 		cursor_node.visible = false
 		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+
 	if current_tool != tool.SELECTOR:
 		if hovering_over_sidebar:
 			cursor_node.position = dm_camera.position - Vector2.ONE * brush_size / 2
@@ -612,9 +618,9 @@ func move_player_view() -> void:
 
 func reshape_selector_cursor_panel() -> void:
 	if selecting:
-		cursor_panel.visible = true
+		cursor_node.visible = true
 	else:
-		cursor_panel.visible = false
+		cursor_node.visible = false
 
 	var mouse_pos: Vector2 = get_global_mouse_position()
 
@@ -635,7 +641,7 @@ func update_tool_visuals() -> void:
 	for i in range(len(button_list)):
 		button_list[i][0].add_theme_stylebox_override("normal", stylebox_button_not_pressed)
 
-	cursor_panel.visible = true
+	cursor_node.visible = true
 
 	tool_label.text = button_list[current_tool][1]
 
@@ -1016,6 +1022,7 @@ func debug() -> void:
 	text += "m2_held: %s\n" % m2_held
 	text += "held_tokens: %s\n" % held_tokens
 	text += "hovered_tokens: %s\n" % hovered_tokens
+	text += "cursor_node.visible: %s\n" % cursor_node.visible
 
 	debug_text.text = text
 
