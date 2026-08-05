@@ -57,7 +57,7 @@ var hovering_over_menu := false
 var performance_mode := false
 var hovering_over_sidebar := false
 var is_dirty := false
-var prev_mask: Texture2D
+var prev_image: Image
 var undo_list: Array = []
 var corner_list: Array = []
 var selector_start_pos := Vector2.ZERO
@@ -500,11 +500,11 @@ func undo() -> void:
 		"draw":
 			pretend_to_draw.emit()
 
-			drawing_texture.texture = payload['mask']
+			drawing_texture.texture = ImageTexture.create_from_image(payload["mask"])
 			drawing_texture.visible = true
 			dm_fog.material.set_shader_parameter("mask_texture", drawing_viewport.get_texture())
 			player_fog.material.set_shader_parameter("mask_texture", drawing_viewport.get_texture())
-			prev_mask = payload['mask']
+			prev_image = payload['mask']
 		"place_token":
 			if not is_instance_valid(payload['tokens']['dm']):
 				undo()
@@ -719,15 +719,13 @@ func update_circular_stylebox(stylebox: StyleBox) -> StyleBox:
 func copy_viewport_texture() -> void:
 	var image: Image = drawing_viewport.get_texture().get_image()
 	image.convert(Image.FORMAT_R8)
-	var image_texture: Texture2D = ImageTexture.new()
-	image_texture = ImageTexture.create_from_image(image)
-	add_to_undo_list(["draw", { "mask": prev_mask }])
+	add_to_undo_list(["draw", { "mask": prev_image }])
 	is_dirty = true
 	# just to make sure we don't use too much RAM
 	# other undos are fine though they don't take up much space
 	if len(undo_list) > UNDO_LIST_MAX_IMAGES:
 		undo_list.pop_front()
-	prev_mask = image_texture
+	prev_image = image
 
 
 func update_fog_texture(color: Color) -> void:
@@ -887,7 +885,7 @@ func load_map(path: String) -> void:
 
 	drawing_viewport.render_target_clear_mode = SubViewport.CLEAR_MODE_ONCE
 
-	prev_mask = mask_image_texture
+	prev_image = mask_image
 
 	dm_fog.visible = true
 	player_fog.visible = true
