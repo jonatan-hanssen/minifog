@@ -39,7 +39,11 @@ const TOKEN_COLOR_LIST: Array = [
 	[Color.BLACK, Color.WHITE, Color.WHITE],
 	[Color.WHITE, Color.BLACK, Color.BLACK],
 ]
+const TOKEN_TOOLTIP_TEXT := "Hold left mouse to drag.\nPress left mouse to delete.\nType a number to change label."
 
+
+# make the correct type
+const ping_scene: PackedScene = preload("res://ping_effect.tscn")
 
 var current_tool: int = 0
 var fog_color_index: int = 0
@@ -119,7 +123,7 @@ var button_list: Array
 
 
 func _ready() -> void:
-	# debug_text.visible = false
+	debug_text.visible = false
 	button_list = [
 		[square_brush_button, "Square Brush"],
 		[round_brush_button, "Round Brush"],
@@ -264,6 +268,7 @@ func _input(event: InputEvent) -> void:
 						else:
 							# move a token
 							add_to_undo_list(["move_token", { 'tokens': hovered_tokens, 'position': hovered_tokens['dm'].position }])
+							hovered_tokens['dm'].tooltip_text = ""
 							is_dirty = true
 							if len(undo_list) > UNDO_LIST_MAX:
 								undo_list.pop_front()
@@ -290,7 +295,9 @@ func _input(event: InputEvent) -> void:
 						# release held token
 						if not held_tokens.is_empty():
 							held_tokens['dm'].mouse_default_cursor_shape = CursorShape.CURSOR_POINTING_HAND
+							held_tokens['dm'].tooltip_text = TOKEN_TOOLTIP_TEXT
 							held_tokens = { }
+							# get_viewport().gui_disable_tooltips = true
 
 			tool.SELECTOR:
 				if (
@@ -313,6 +320,17 @@ func _input(event: InputEvent) -> void:
 						m2_held = event.pressed
 						on_m2_pressed.emit(event.pressed)
 					reshape_selector_cursor_panel()
+			tool.POINTER:
+				if event.pressed:
+					if event.button_index == MOUSE_BUTTON_LEFT:
+						var ping: Node2D = ping_scene.instantiate()
+						ping.position = get_global_mouse_position()
+						add_child(ping)
+						# add it to player view too
+						var ping_player: Node2D = ping_scene.instantiate()
+						ping_player.position = get_global_mouse_position()
+						player_window.add_child(ping_player)
+
 			_:
 				if event.button_index == MOUSE_BUTTON_LEFT:
 					drawing_texture.visible = false
@@ -599,7 +617,7 @@ func make_token(pos: Vector2 = Vector2.INF, text: String = "", token_size_temp: 
 			player_window.add_child(token)
 			token_dict['player'] = token
 
-	token_dict['dm'].tooltip_text = "Hold left mouse to drag.\nPress left mouse to delete.\nType a number to change label."
+	token_dict['dm'].tooltip_text = TOKEN_TOOLTIP_TEXT
 	token_dict['dm'].connect("mouse_entered", func() -> void: hovered_tokens = token_dict)
 	token_dict['dm'].connect("mouse_exited", func() -> void: hovered_tokens = { })
 	token_dict['player'].connect("mouse_entered", func() -> void: hovered_tokens = token_dict)
@@ -686,9 +704,8 @@ func update_tool_visuals() -> void:
 
 			square_brush_button.add_theme_stylebox_override("normal", stylebox_button_pressed)
 		tool.ROUND_BRUSH:
-			var stylebox_cursor: StyleBox = cursor_panel.get_theme_stylebox("panel").duplicate()
 			set_cursor_shape(CursorShape.CURSOR_CROSS)
-			stylebox_cursor = update_circular_stylebox(stylebox_cursor)
+			var stylebox_cursor := make_circular_stylebox()
 			stylebox_cursor.bg_color = Color.TRANSPARENT
 			stylebox_cursor.border_color = Color.BLACK
 			cursor_panel.add_theme_stylebox_override("panel", stylebox_cursor)
@@ -701,14 +718,13 @@ func update_tool_visuals() -> void:
 			selector_button.add_theme_stylebox_override("normal", stylebox_button_pressed)
 			reshape_selector_cursor_panel()
 		tool.TOKEN_PLACER:
-			var stylebox_cursor: StyleBox = cursor_panel.get_theme_stylebox("panel").duplicate()
 			set_cursor_shape()
 
 			scrollbar.set_value_no_signal(last_token_size)
 			brush_size = last_token_size
 			scrollbar_label.text = str(int(brush_size))
 
-			stylebox_cursor = update_circular_stylebox(stylebox_cursor)
+			var stylebox_cursor := make_circular_stylebox()
 			stylebox_cursor.bg_color = TOKEN_COLOR_LIST[token_color_index][0]
 			stylebox_cursor.border_color = TOKEN_COLOR_LIST[token_color_index][1]
 			cursor_panel.add_theme_stylebox_override("panel", stylebox_cursor)
@@ -716,10 +732,9 @@ func update_tool_visuals() -> void:
 			token_button.add_theme_stylebox_override("normal", stylebox_button_pressed)
 
 		tool.POINTER:
-			var stylebox_cursor: StyleBox = cursor_panel.get_theme_stylebox("panel").duplicate()
 			player_pointer.visible = true
 
-			stylebox_cursor = update_circular_stylebox(stylebox_cursor)
+			var stylebox_cursor := make_circular_stylebox()
 			stylebox_cursor.bg_color = Color.RED
 			stylebox_cursor.border_color = Color.RED
 			cursor_panel.add_theme_stylebox_override("panel", stylebox_cursor)
@@ -730,7 +745,8 @@ func update_tool_visuals() -> void:
 	cursor_panel.size = Vector2(brush_size, brush_size)
 
 
-func update_circular_stylebox(stylebox: StyleBox) -> StyleBox:
+func make_circular_stylebox() -> StyleBox:
+	var stylebox: StyleBox = cursor_panel.get_theme_stylebox("panel").duplicate()
 	stylebox.corner_detail = 32
 	stylebox.corner_radius_top_left = brush_size / 2 - 1
 	stylebox.corner_radius_top_right = brush_size / 2 - 1
@@ -918,8 +934,8 @@ func load_map(path: String) -> void:
 	dm_camera.position = Vector2(fog_image_width * 0.5, fog_image_height * 0.5)
 	player_camera.position = Vector2(fog_image_width * 0.5, fog_image_height * 0.5)
 
-	move_background(player_root)
-	move_background(dm_root)
+	offset_background(player_root)
+	offset_background(dm_root)
 	move_player_view()
 
 	drawing_texture.visible = true
@@ -951,7 +967,7 @@ func select_tool(index: int) -> void:
 				dictionary['tokens']['dm'].mouse_filter = Control.MOUSE_FILTER_STOP
 
 
-func move_background(background_node: Node2D) -> void:
+func offset_background(background_node: Node2D) -> void:
 	var map_image_width: int
 	var map_image_height: int
 	if map_image != null:
@@ -1053,10 +1069,6 @@ func update_colorscheme(id: int) -> void:
 
 	for i in range(len(FOG_COLOR_LIST)):
 		colorscheme_menu.set_item_checked(i, i == id)
-
-
-func on_files_dropped(files: PackedStringArray) -> void:
-	print(files)
 
 
 func _on_help_id_pressed(id: int) -> void:

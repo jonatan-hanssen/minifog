@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://b0vnvbvq7d2id"]
+
+[ext_resource type="Script" uid="uid://b417ijvg6ibbc" path="res://scripts/ping_effect.gd" id="1_533o4"]
+
+[node name="PingEffect" type="Node2D" unique_id=942221727]
+script = ExtResource("1_533o4")

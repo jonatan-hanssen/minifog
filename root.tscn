@@ -577,7 +577,7 @@ layout_mode = 2
 size_flags_vertical = 3
 size_flags_stretch_ratio = 2.0
 tooltip_text = "Token placer (click to place,
-left click on a token to delete,
+right click on a token to delete,
 type a number to assign it to the token)"
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_styles/normal = SubResource("StyleBoxFlat_tw3kd")
@@ -592,7 +592,7 @@ expand_icon = true
 layout_mode = 2
 size_flags_vertical = 3
 size_flags_stretch_ratio = 2.0
-tooltip_text = "Pointer"
+tooltip_text = "Pointer (click to ping)"
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_styles/normal = SubResource("StyleBoxFlat_tw3kd")
 theme_override_styles/pressed = SubResource("StyleBoxEmpty_gd4vy")
