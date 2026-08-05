@@ -17,7 +17,7 @@ const PlayerInfoDegus = preload("res://resources/PlayerInfo.png")
 const Pointer = preload("res://resources/PointerIcon.png")
 const BRUSH_SIZE_MIN := 5
 const BRUSH_SIZE_MAX := 500
-const UNDO_LIST_MAX_IMAGES := 10000
+const UNDO_LIST_MAX_IMAGES := 20
 const UNDO_LIST_MAX_ALL := 100
 const MAX_IMAGE_SIZE := 3000.0
 const CORNER_BASE_SIZE := 16
@@ -58,7 +58,6 @@ var performance_mode := false
 var hovering_over_sidebar := false
 var is_dirty := false
 var prev_mask: Texture2D
-var prev_image_packed: PackedByteArray
 var undo_list: Array = []
 var corner_list: Array = []
 var selector_start_pos := Vector2.ZERO
@@ -121,7 +120,7 @@ var button_list: Array
 
 
 func _ready() -> void:
-	# debug_text.visible = false
+	debug_text.visible = false
 	button_list = [
 		[square_brush_button, "Square Brush"],
 		[round_brush_button, "Round Brush"],
@@ -488,29 +487,6 @@ func process_keypresses(event: InputEventKey) -> void:
 				serialize_tokens(all_placed_tokens)
 
 
-func unpack_image_bits(data: PackedByteArray, width: int, height: int) -> Image:
-	var pixel_count := width * height
-
-	var pixels := PackedByteArray()
-	pixels.resize(pixel_count)
-
-	for i in pixel_count:
-		var byte := data[i >> 3]
-		var bit := (byte >> (i & 7)) & 1
-
-		pixels[i] = 255 if bit else 0
-
-	var image := Image.create_from_data(
-		width,
-		height,
-		false,
-		Image.FORMAT_R8,
-		pixels
-	)
-
-	return image
-
-
 func undo() -> void:
 	if undo_list.is_empty():
 		return
@@ -524,21 +500,11 @@ func undo() -> void:
 		"draw":
 			pretend_to_draw.emit()
 
-
-			var delta: PackedByteArray = payload["mask"].decompress(
-				fog_image_width * fog_image_height,
-				FileAccess.COMPRESSION_ZSTD,
-			)
-
-			var restored_bits := xor_packed(prev_image_packed, delta)
-			var restored_image := unpack_image_bits(restored_bits, fog_image_width, fog_image_height)
-
-			drawing_texture.texture = ImageTexture.create_from_image(restored_image)
+			drawing_texture.texture = payload['mask']
 			drawing_texture.visible = true
 			dm_fog.material.set_shader_parameter("mask_texture", drawing_viewport.get_texture())
 			player_fog.material.set_shader_parameter("mask_texture", drawing_viewport.get_texture())
-			prev_image_packed = restored_bits
-
+			prev_mask = payload['mask']
 		"place_token":
 			if not is_instance_valid(payload['tokens']['dm']):
 				undo()
@@ -750,44 +716,18 @@ func update_circular_stylebox(stylebox: StyleBox) -> StyleBox:
 	return stylebox
 
 
-func xor_packed(a: PackedByteArray, b: PackedByteArray) -> PackedByteArray:
-	assert(a.size() == b.size())
-
-	var out := PackedByteArray()
-	out.resize(a.size())
-
-	for i in a.size():
-		out[i] = a[i] ^ b[i]
-
-	return out
-
-func pack_image_bits(image: Image) -> PackedByteArray:
-	assert(image.get_format() == Image.FORMAT_R8)
-
-	var src := image.get_data()
-	var dst := PackedByteArray()
-	dst.resize((src.size() + 7) / 8)
-
-	for i in src.size():
-		if src[i] != 0:
-			dst[i >> 3] |= 1 << (i & 7)
-
-	return dst
-
 func copy_viewport_texture() -> void:
 	var image: Image = drawing_viewport.get_texture().get_image()
 	image.convert(Image.FORMAT_R8)
-	var cur_image_packed := pack_image_bits(image)
-
-	var delta: PackedByteArray = xor_packed(prev_image_packed, cur_image_packed)
-
-	add_to_undo_list(["draw", { "mask": delta.compress(FileAccess.COMPRESSION_ZSTD) }])
+	var image_texture: Texture2D = ImageTexture.new()
+	image_texture = ImageTexture.create_from_image(image)
+	add_to_undo_list(["draw", { "mask": prev_mask }])
 	is_dirty = true
 	# just to make sure we don't use too much RAM
 	# other undos are fine though they don't take up much space
 	if len(undo_list) > UNDO_LIST_MAX_IMAGES:
 		undo_list.pop_front()
-	prev_image_packed = cur_image_packed
+	prev_mask = image_texture
 
 
 func update_fog_texture(color: Color) -> void:
@@ -947,7 +887,6 @@ func load_map(path: String) -> void:
 
 	drawing_viewport.render_target_clear_mode = SubViewport.CLEAR_MODE_ONCE
 
-	prev_image_packed = pack_image_bits(mask_image)
 	prev_mask = mask_image_texture
 
 	dm_fog.visible = true
@@ -1084,9 +1023,6 @@ func debug() -> void:
 	text += "held_tokens: %s\n" % held_tokens
 	text += "hovered_tokens: %s\n" % hovered_tokens
 	text += "cursor_node.visible: %s\n" % cursor_node.visible
-	for i in range(len(undo_list)):
-		text += str(undo_list[i])
-		text += "\n"
 
 	debug_text.text = text
 
