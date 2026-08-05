@@ -17,8 +17,7 @@ const PlayerInfoDegus = preload("res://resources/PlayerInfo.png")
 const Pointer = preload("res://resources/PointerIcon.png")
 const BRUSH_SIZE_MIN := 5
 const BRUSH_SIZE_MAX := 500
-const UNDO_LIST_MAX_IMAGES := 20
-const UNDO_LIST_MAX_ALL := 100
+const UNDO_LIST_MAX := 10000
 const MAX_IMAGE_SIZE := 3000.0
 const CORNER_BASE_SIZE := 16
 const FOG_COLOR_LIST: Array = [
@@ -41,6 +40,7 @@ const TOKEN_COLOR_LIST: Array = [
 ]
 
 
+var undo_texture: Texture
 var current_tool: int = 0
 var fog_color_index: int = 0
 var token_color_index: int = 0
@@ -227,7 +227,7 @@ func connect_signals() -> void:
 
 
 func _process(_delta: float) -> void:
-	debug()
+	# debug()
 	move_player_view()
 	update_cursor_position()
 
@@ -255,14 +255,14 @@ func _input(event: InputEvent) -> void:
 							set_cursor_shape(CursorShape.CURSOR_MOVE)
 							add_to_undo_list(["place_token", { 'tokens': tokens }])
 							is_dirty = true
-							if len(undo_list) > UNDO_LIST_MAX_ALL:
+							if len(undo_list) > UNDO_LIST_MAX:
 								undo_list.pop_front()
 
 				if not hovered_tokens.is_empty() and event.pressed:
 					if event.button_index == MOUSE_BUTTON_LEFT:
 						add_to_undo_list(["move_token", { 'tokens': hovered_tokens, 'position': hovered_tokens['dm'].position }])
 						is_dirty = true
-						if len(undo_list) > UNDO_LIST_MAX_ALL:
+						if len(undo_list) > UNDO_LIST_MAX:
 							undo_list.pop_front()
 						held_tokens = hovered_tokens
 						held_tokens['dm'].mouse_default_cursor_shape = CursorShape.CURSOR_MOVE
@@ -274,7 +274,7 @@ func _input(event: InputEvent) -> void:
 						player_token.visible = false
 						add_to_undo_list(["remove_token", { 'tokens': { 'dm': dm_token, 'player': player_token } }])
 						is_dirty = true
-						if len(undo_list) > UNDO_LIST_MAX_ALL:
+						if len(undo_list) > UNDO_LIST_MAX:
 							undo_list.pop_front()
 
 						hovered_tokens = { }
@@ -427,7 +427,7 @@ func process_keypresses(event: InputEventKey) -> void:
 			var previous_number: String = active_tokens['dm'].get_child(0).text
 			add_to_undo_list(['change_number', { 'tokens': active_tokens, 'number': previous_number }])
 			is_dirty = true
-			if len(undo_list) > UNDO_LIST_MAX_ALL:
+			if len(undo_list) > UNDO_LIST_MAX:
 				undo_list.pop_front()
 			var number := str(event.keycode - KEY_0)
 			active_tokens['dm'].get_child(0).text = number
@@ -500,11 +500,30 @@ func undo() -> void:
 		"draw":
 			pretend_to_draw.emit()
 
-			drawing_texture.texture = ImageTexture.create_from_image(payload["mask"])
+			var height: int = payload["size"].y
+			var width: int = payload["size"].x
+			var data: PackedByteArray = payload["data"]
+
+			var uncompressed := data.decompress(
+				height * width,
+				FileAccess.COMPRESSION_ZSTD,
+			)
+			var image: = Image.create_from_data(
+				width,
+				height,
+				false,
+				Image.FORMAT_R8,
+				uncompressed,
+			)
+
+			drawing_texture.texture = ImageTexture.create_from_image(image)
 			drawing_texture.visible = true
+
 			dm_fog.material.set_shader_parameter("mask_texture", drawing_viewport.get_texture())
 			player_fog.material.set_shader_parameter("mask_texture", drawing_viewport.get_texture())
-			prev_image = payload['mask']
+
+			prev_image = image
+
 		"place_token":
 			if not is_instance_valid(payload['tokens']['dm']):
 				undo()
@@ -719,12 +738,10 @@ func update_circular_stylebox(stylebox: StyleBox) -> StyleBox:
 func copy_viewport_texture() -> void:
 	var image: Image = drawing_viewport.get_texture().get_image()
 	image.convert(Image.FORMAT_R8)
-	add_to_undo_list(["draw", { "mask": prev_image }])
+	var buffer: PackedByteArray = prev_image.get_data()
+	var compressed: PackedByteArray = buffer.compress(FileAccess.COMPRESSION_ZSTD)
+	add_to_undo_list(["draw", { "data": compressed, "size": prev_image.get_size() }])
 	is_dirty = true
-	# just to make sure we don't use too much RAM
-	# other undos are fine though they don't take up much space
-	if len(undo_list) > UNDO_LIST_MAX_IMAGES:
-		undo_list.pop_front()
 	prev_image = image
 
 
@@ -1021,6 +1038,9 @@ func debug() -> void:
 	text += "held_tokens: %s\n" % held_tokens
 	text += "hovered_tokens: %s\n" % hovered_tokens
 	text += "cursor_node.visible: %s\n" % cursor_node.visible
+
+	for i in range(len(undo_list)):
+		text += str(undo_list[i]) + "\n"
 
 	debug_text.text = text
 
