@@ -17,9 +17,10 @@ const PlayerInfoDegus = preload("res://resources/PlayerInfo.png")
 const Pointer = preload("res://resources/PointerIcon.png")
 const BRUSH_SIZE_MIN := 5
 const BRUSH_SIZE_MAX := 500
-const UNDO_LIST_MAX := 10000
+const UNDO_LIST_MAX := 200 # should not matter, we use very little ram
 const MAX_IMAGE_SIZE := 3000.0
 const CORNER_BASE_SIZE := 16
+const FOG_SCALING: float = 1.2
 const FOG_COLOR_LIST: Array = [
 	Color.BURLYWOOD, # not actually used, stand in for fog
 	Color.DEEP_PINK, # not actually used, stand in for colorful fog
@@ -40,7 +41,6 @@ const TOKEN_COLOR_LIST: Array = [
 ]
 
 
-var undo_texture: Texture
 var current_tool: int = 0
 var fog_color_index: int = 0
 var token_color_index: int = 0
@@ -54,8 +54,8 @@ var m1_held := false
 var m2_held := false
 var selecting := false
 var hovering_over_menu := false
-var performance_mode := false
 var hovering_over_sidebar := false
+var performance_mode := false
 var is_dirty := false
 var prev_image: Image
 var undo_list: Array = []
@@ -64,7 +64,6 @@ var selector_start_pos := Vector2.ZERO
 var selector_end_pos := Vector2.ZERO
 var all_placed_tokens: Array[Dictionary] = []
 var current_file_path: String
-var fog_scaling: float = 1.2
 var mask_image_texture: Texture2D
 var mask_texture: ImageTexture
 var map_image: Image
@@ -120,7 +119,7 @@ var button_list: Array
 
 
 func _ready() -> void:
-	debug_text.visible = false
+	# debug_text.visible = false
 	button_list = [
 		[square_brush_button, "Square Brush"],
 		[round_brush_button, "Round Brush"],
@@ -204,7 +203,10 @@ func connect_signals() -> void:
 			update_tool_visuals()
 			button.release_focus()
 		)
-	drawing_node.connect("on_finished_drawing", wait_one_frame_and_then_copy)
+	drawing_node.connect("on_finished_drawing", func() -> void:
+		await RenderingServer.frame_post_draw
+		copy_viewport_texture()
+	)
 
 	menu_bar.connect("mouse_entered", func() -> void: hovering_over_menu = true)
 	menu_bar.connect("mouse_exited", func() -> void: hovering_over_menu = false)
@@ -246,8 +248,9 @@ func _input(event: InputEvent) -> void:
 
 		match current_tool:
 			tool.TOKEN_PLACER:
-				if event.button_index == MOUSE_BUTTON_LEFT:
-					if event.pressed:
+				if event.pressed:
+					if event.button_index == MOUSE_BUTTON_LEFT:
+						# make a token
 						if hovered_tokens.is_empty():
 							var tokens: Dictionary[String, Panel] = make_token()
 							hovered_tokens = tokens
@@ -258,16 +261,18 @@ func _input(event: InputEvent) -> void:
 							if len(undo_list) > UNDO_LIST_MAX:
 								undo_list.pop_front()
 
-				if not hovered_tokens.is_empty() and event.pressed:
-					if event.button_index == MOUSE_BUTTON_LEFT:
-						add_to_undo_list(["move_token", { 'tokens': hovered_tokens, 'position': hovered_tokens['dm'].position }])
-						is_dirty = true
-						if len(undo_list) > UNDO_LIST_MAX:
-							undo_list.pop_front()
-						held_tokens = hovered_tokens
-						held_tokens['dm'].mouse_default_cursor_shape = CursorShape.CURSOR_MOVE
+						else:
+							# move a token
+							add_to_undo_list(["move_token", { 'tokens': hovered_tokens, 'position': hovered_tokens['dm'].position }])
+							is_dirty = true
+							if len(undo_list) > UNDO_LIST_MAX:
+								undo_list.pop_front()
+							held_tokens = hovered_tokens
+							held_tokens['dm'].mouse_default_cursor_shape = CursorShape.CURSOR_MOVE
 
-					if event.button_index == MOUSE_BUTTON_RIGHT:
+
+					# delete a token
+					if event.button_index == MOUSE_BUTTON_RIGHT and not hovered_tokens.is_empty():
 						var dm_token: Panel = hovered_tokens['dm']
 						var player_token: Panel = hovered_tokens['player']
 						dm_token.visible = false
@@ -278,14 +283,14 @@ func _input(event: InputEvent) -> void:
 							undo_list.pop_front()
 
 						hovered_tokens = { }
-						return
 
-				if not held_tokens.is_empty():
+				# not pressed (released)
+				else:
 					if event.button_index == MOUSE_BUTTON_LEFT:
-						if not event.pressed:
+						# release held token
+						if not held_tokens.is_empty():
 							held_tokens['dm'].mouse_default_cursor_shape = CursorShape.CURSOR_POINTING_HAND
 							held_tokens = { }
-					return
 
 			tool.SELECTOR:
 				if (
@@ -770,11 +775,11 @@ func update_fog_texture(color: Color) -> void:
 
 func get_fog_size(image_size: Vector2i) -> void:
 	if image_size[0] > image_size[1]:
-		fog_image_width = int(image_size[0] * fog_scaling)
-		fog_image_height = int(image_size[0] * fog_scaling)
+		fog_image_width = int(image_size[0] * FOG_SCALING)
+		fog_image_height = int(image_size[0] * FOG_SCALING)
 	else:
-		fog_image_width = int(image_size[1] * fog_scaling)
-		fog_image_height = int(image_size[1] * fog_scaling)
+		fog_image_width = int(image_size[1] * FOG_SCALING)
+		fog_image_height = int(image_size[1] * FOG_SCALING)
 
 
 func load_map(path: String) -> void:
@@ -921,11 +926,6 @@ func load_map(path: String) -> void:
 	pretend_to_draw.emit()
 	dm_fog.material.set_shader_parameter("mask_texture", drawing_viewport.get_texture())
 	player_fog.material.set_shader_parameter("mask_texture", drawing_viewport.get_texture())
-
-
-func wait_one_frame_and_then_copy() -> void:
-	await RenderingServer.frame_post_draw
-	copy_viewport_texture()
 
 
 func are_we_inside_sidebar() -> void:
