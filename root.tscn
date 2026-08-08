@@ -416,6 +416,7 @@ material = SubResource("ShaderMaterial_xsao3")
 layout_mode = 0
 offset_right = 70.0
 offset_bottom = 70.0
+mouse_filter = 2
 texture = ExtResource("4_ak8k0")
 expand_mode = 1
 metadata/_edit_use_anchors_ = true
@@ -671,6 +672,7 @@ horizontal_alignment = 1
 layout_mode = 2
 
 [node name="TextEdit" type="TextEdit" parent="GUI" unique_id=1527001405]
+visible = false
 offset_left = 7.0
 offset_top = 76.0
 offset_right = 317.0
@@ -682,6 +684,7 @@ offset_bottom = 459.0
 z_index = -1
 offset_right = 40.0
 offset_bottom = 40.0
+mouse_filter = 2
 
 [node name="PlayerWindow" type="Window" parent="." unique_id=208462062]
 oversampling_override = 1.0
@@ -716,14 +719,10 @@ offset_bottom = 8.0
 
 [node name="CursorNode" type="Node2D" parent="." unique_id=598258814]
 
-[node name="TextureRect" type="TextureRect" parent="CursorNode" unique_id=138592451]
-offset_right = 40.0
-offset_bottom = 40.0
-expand_mode = 1
-
 [node name="Panel" type="Panel" parent="CursorNode" unique_id=30944564]
 offset_right = 40.0
 offset_bottom = 40.0
+mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_huihk")
 
 [node name="PlayerViewRectangle" type="Panel" parent="." unique_id=1497457654]
@@ -733,6 +732,7 @@ offset_left = 133.0
 offset_top = -225.0
 offset_right = 173.0
 offset_bottom = -185.0
+mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_bf3um")
 
 [node name="TextEdit" type="TextEdit" parent="PlayerViewRectangle" unique_id=559168677]
@@ -742,6 +742,7 @@ offset_left = 3.0
 offset_top = -20.0
 offset_right = 138.0
 offset_bottom = 18.0
+mouse_filter = 2
 theme_override_colors/font_readonly_color = Color(0.2, 0.2, 0.2, 1)
 theme_override_constants/line_spacing = 0
 theme_override_font_sizes/font_size = 14

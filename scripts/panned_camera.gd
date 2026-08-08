@@ -1,6 +1,9 @@
 extends Camera2D
 
 signal on_mouse_pos_changed(pos : Vector2)
+signal has_focus_changed(has_focus : bool)
+signal has_mouse_changed(has_mouse : bool)
+signal view_changed
 
 const MIN_ZOOM: float = 0.1
 const MAX_ZOOM: float = 5.0
@@ -19,15 +22,33 @@ var down_held := false
 
 var has_mouse := false
 var has_focus := false
+# make new versions of has mouse and has focus that can be accessed from other nodes
+
+
 
 @onready var root : Control = get_node('/root/Root')
 
 func _ready() -> void:
-	get_viewport().connect('mouse_entered', func() -> void: has_mouse = true)
-	get_viewport().connect('mouse_exited', func() -> void: has_mouse = false)
+	get_viewport().connect('mouse_entered', func() -> void:
+		has_mouse = true
+		has_mouse_changed.emit(has_mouse)
+	)
+	get_viewport().connect('mouse_exited', func() -> void:
+		has_mouse = false
+		has_mouse_changed.emit(has_mouse)
+	)
 
-	get_viewport().connect('focus_entered', func() -> void: has_focus = true)
-	get_viewport().connect('focus_exited', func() -> void: has_focus = false)
+	get_viewport().connect('focus_entered', func() -> void:
+		has_focus = true
+		has_focus_changed.emit(has_focus)
+	)
+	get_viewport().connect('focus_exited', func() -> void:
+		has_focus = false
+		has_focus_changed.emit(has_focus)
+	)
+
+	get_viewport().connect('size_changed', func() -> void: view_changed.emit())
+
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey:
@@ -63,16 +84,19 @@ func _input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP and not ctrl_held:
 			target_zoom = min(target_zoom + ZOOM_INCREMENT, MAX_ZOOM)
 			zoom = Vector2.ONE * target_zoom
+			view_changed.emit()
 			on_mouse_pos_changed.emit(get_global_mouse_position())
 
 		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN and not ctrl_held:
 			target_zoom = max(target_zoom - ZOOM_INCREMENT, MIN_ZOOM)
 			zoom = Vector2.ONE * target_zoom
+			view_changed.emit()
 			on_mouse_pos_changed.emit(get_global_mouse_position())
 
 	if event is InputEventMouseMotion:
 		if event.button_mask == MOUSE_BUTTON_MASK_MIDDLE:
 			position -= event.relative / zoom
+			view_changed.emit()
 			on_mouse_pos_changed.emit(get_global_mouse_position())
 
 
@@ -88,14 +112,18 @@ func _physics_process(delta : float) -> void:
 
 	if left_held:
 		position.x -= MOVE_SPEED * delta / zoom.x
+		view_changed.emit()
 		on_mouse_pos_changed.emit(get_global_mouse_position())
 	if right_held:
 		position.x += MOVE_SPEED * delta / zoom.x
+		view_changed.emit()
 		on_mouse_pos_changed.emit(get_global_mouse_position())
 	if up_held:
 		position.y -= MOVE_SPEED * delta / zoom.x
+		view_changed.emit()
 		on_mouse_pos_changed.emit(get_global_mouse_position())
 	if down_held:
 		position.y += MOVE_SPEED * delta / zoom.x
+		view_changed.emit()
 		on_mouse_pos_changed.emit(get_global_mouse_position())
 

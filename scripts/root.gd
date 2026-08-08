@@ -10,6 +10,7 @@ signal pretend_to_draw
 
 enum tool { SQUARE_BRUSH, ROUND_BRUSH, SELECTOR, TOKEN_PLACER, POINTER, LENGTH }
 
+var input_calls := 0
 const PerlinTexture = preload("res://resources/Fog.jpg")
 const PlasmaTexture = preload("res://resources/Plasma.jpg")
 const InfoDegus = preload("res://resources/Info.png")
@@ -45,6 +46,7 @@ const TOKEN_TOOLTIP_TEXT := "Hold left mouse to drag.\nPress left mouse to delet
 # make the correct type
 const ping_scene: PackedScene = preload("res://ping_effect.tscn")
 
+var player_camera_has_mouse: bool = false
 var current_tool: int = 0
 var fog_color_index: int = 0
 var token_color_index: int = 0
@@ -56,6 +58,7 @@ var last_token_size: int = 50
 var ctrl_held := false
 var m1_held := false
 var m2_held := false
+var m3_held := false
 var selecting := false
 var hovering_over_menu := false
 var hovering_over_sidebar := false
@@ -123,7 +126,6 @@ var button_list: Array
 
 
 func _ready() -> void:
-	debug_text.visible = false
 	button_list = [
 		[square_brush_button, "Square Brush"],
 		[round_brush_button, "Round Brush"],
@@ -196,6 +198,9 @@ func connect_signals() -> void:
 	help_menu.connect("id_pressed", _on_help_id_pressed)
 	colorscheme_menu.connect("id_pressed", update_colorscheme)
 
+	player_camera.connect("has_mouse_changed", func(has_mouse: bool) -> void: player_camera_has_mouse = has_mouse)
+	player_camera.connect("view_changed", align_player_view)
+
 
 	for i in range(len(button_list)):
 		var button: Button = button_list[i][0]
@@ -203,10 +208,7 @@ func connect_signals() -> void:
 
 		button.connect("pressed", func() -> void: select_tool(i))
 		button.connect("mouse_entered", func() -> void: tool_label.text = tool_name)
-		button.connect("mouse_exited", func() -> void:
-			update_tool_visuals()
-			button.release_focus()
-		)
+		button.connect("mouse_exited", func() -> void: button.release_focus())
 	drawing_node.connect("on_finished_drawing", func() -> void:
 		await RenderingServer.frame_post_draw
 		copy_viewport_texture()
@@ -233,12 +235,15 @@ func connect_signals() -> void:
 
 
 func _process(_delta: float) -> void:
-	# debug()
-	move_player_view()
+	debug()
 	update_cursor_position()
+	set_cursor_visibility()
+	set_cursor_node_visibility()
+	set_cursor_shape()
 
 
 func _input(event: InputEvent) -> void:
+	input_calls += 1
 	if event is InputEventKey:
 		process_keypresses(event)
 
@@ -249,6 +254,8 @@ func _input(event: InputEvent) -> void:
 		if (hovering_over_menu or hovering_over_sidebar) and event.pressed:
 			return
 
+		if event.button_index == MOUSE_BUTTON_MIDDLE:
+			m3_held = event.pressed
 
 		match current_tool:
 			tool.TOKEN_PLACER:
@@ -258,8 +265,6 @@ func _input(event: InputEvent) -> void:
 						if hovered_tokens.is_empty():
 							var tokens: Dictionary[String, Panel] = make_token()
 							hovered_tokens = tokens
-							cursor_node.visible = false
-							set_cursor_shape(CursorShape.CURSOR_MOVE)
 							add_to_undo_list(["place_token", { 'tokens': tokens }])
 							is_dirty = true
 							if len(undo_list) > UNDO_LIST_MAX:
@@ -269,11 +274,11 @@ func _input(event: InputEvent) -> void:
 							# move a token
 							add_to_undo_list(["move_token", { 'tokens': hovered_tokens, 'position': hovered_tokens['dm'].position }])
 							hovered_tokens['dm'].tooltip_text = ""
+							hovered_tokens['dm'].mouse_default_cursor_shape = CursorShape.CURSOR_MOVE
 							is_dirty = true
 							if len(undo_list) > UNDO_LIST_MAX:
 								undo_list.pop_front()
 							held_tokens = hovered_tokens
-							held_tokens['dm'].mouse_default_cursor_shape = CursorShape.CURSOR_MOVE
 
 
 					# delete a token
@@ -294,8 +299,8 @@ func _input(event: InputEvent) -> void:
 					if event.button_index == MOUSE_BUTTON_LEFT:
 						# release held token
 						if not held_tokens.is_empty():
-							held_tokens['dm'].mouse_default_cursor_shape = CursorShape.CURSOR_POINTING_HAND
 							held_tokens['dm'].tooltip_text = TOKEN_TOOLTIP_TEXT
+							held_tokens['dm'].mouse_default_cursor_shape = CursorShape.CURSOR_POINTING_HAND
 							held_tokens = { }
 							# get_viewport().gui_disable_tooltips = true
 
@@ -350,12 +355,6 @@ func _input(event: InputEvent) -> void:
 					on_m2_pressed.emit(event.pressed)
 
 		match event.button_index:
-			MOUSE_BUTTON_MIDDLE:
-				if event.pressed:
-					set_cursor_shape(CursorShape.CURSOR_DRAG)
-				else:
-					update_tool_visuals()
-
 			MOUSE_BUTTON_WHEEL_UP:
 				if ctrl_held:
 					update_brush_size(min(max(BRUSH_SIZE_MIN, brush_size - 5), BRUSH_SIZE_MAX))
@@ -371,10 +370,6 @@ func _input(event: InputEvent) -> void:
 		if m1_held or m2_held:
 			drawing_texture.visible = false
 
-		if hovered_tokens.is_empty():
-			cursor_node.visible = true
-			set_cursor_shape()
-
 		match current_tool:
 			tool.POINTER:
 				player_pointer.position = get_global_mouse_position() - player_pointer.size / 2
@@ -384,13 +379,6 @@ func _input(event: InputEvent) -> void:
 					held_tokens['dm'].position = get_global_mouse_position() - Vector2.ONE * held_tokens['dm'].size / 2
 					held_tokens['player'].position = get_global_mouse_position() - Vector2.ONE * held_tokens['player'].size / 2
 
-				if hovered_tokens.is_empty():
-					cursor_node.visible = true
-					set_cursor_shape()
-
-				elif not m1_held and not m2_held:
-					cursor_node.visible = false
-					set_cursor_shape(CursorShape.CURSOR_POINTING_HAND)
 
 
 func populate_color_bar() -> void:
@@ -427,10 +415,6 @@ func populate_color_bar() -> void:
 
 
 func update_cursor_position() -> void:
-	if hovering_over_menu or hovering_over_sidebar:
-		cursor_node.visible = false
-		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
-
 	if current_tool != tool.SELECTOR:
 		if hovering_over_sidebar:
 			cursor_node.position = dm_camera.position - Vector2.ONE * brush_size / 2
@@ -491,12 +475,10 @@ func process_keypresses(event: InputEventKey) -> void:
 						warning.dialog_text = "Cannot save an empty map"
 						warning.popup_centered()
 					elif current_file_path.ends_with(".map"):
-						set_cursor_shape(CursorShape.CURSOR_WAIT)
 						get_window().title = "DM Window (saving...)"
 						await get_tree().process_frame
 						await get_tree().process_frame
 						write_map(current_file_path)
-						set_cursor_shape()
 					else:
 						save_dialog.popup()
 			KEY_L:
@@ -608,8 +590,6 @@ func make_token(pos: Vector2 = Vector2.INF, text: String = "", token_size_temp: 
 		stylebox_cursor.border_color = TOKEN_COLOR_LIST[token_color_id][1]
 		token.add_theme_stylebox_override("panel", stylebox_cursor)
 
-		# token.mouse_default_cursor_shape = CursorShape.CURSOR_POINTING_HAND
-
 		if i == 0:
 			add_child(token)
 			token_dict['dm'] = token
@@ -623,6 +603,8 @@ func make_token(pos: Vector2 = Vector2.INF, text: String = "", token_size_temp: 
 	token_dict['player'].connect("mouse_entered", func() -> void: hovered_tokens = token_dict)
 	token_dict['player'].connect("mouse_exited", func() -> void: hovered_tokens = { })
 
+	token_dict['dm'].mouse_default_cursor_shape = CursorShape.CURSOR_POINTING_HAND
+	
 	all_placed_tokens.append({ 'tokens': token_dict, 'color_id': token_color_id })
 
 	return token_dict
@@ -643,14 +625,27 @@ func update_brush_size(value: float) -> void:
 	update_tool_visuals()
 
 
-func set_cursor_shape(shape: CursorShape = CursorShape.CURSOR_ARROW) -> void:
-	mouse_default_cursor_shape = shape
-	cursor_panel.mouse_default_cursor_shape = shape
-	player_view.mouse_default_cursor_shape = shape
-	player_view_text.mouse_default_cursor_shape = shape
+func set_cursor_shape() -> void:
+	var shape: int = CursorShape.CURSOR_ARROW
 
 
-func move_player_view() -> void:
+	match current_tool:
+		tool.SQUARE_BRUSH:
+			shape = CursorShape.CURSOR_CROSS
+
+		tool.ROUND_BRUSH:
+			shape = CursorShape.CURSOR_CROSS
+
+
+	if m3_held:
+		shape = CursorShape.CURSOR_DRAG
+
+	mouse_default_cursor_shape = shape as CursorShape
+	Input.set_default_cursor_shape(shape as Input.CursorShape)
+	cursor_panel.mouse_default_cursor_shape = shape as CursorShape
+
+
+func align_player_view() -> void:
 	var view_size: Vector2 = player_window.get_visible_rect().size
 	var view_transform: Transform2D = player_window.get_canvas_transform()
 
@@ -659,11 +654,6 @@ func move_player_view() -> void:
 
 
 func reshape_selector_cursor_panel() -> void:
-	if selecting:
-		cursor_node.visible = true
-	else:
-		cursor_node.visible = false
-
 	var mouse_pos: Vector2 = get_global_mouse_position()
 
 	cursor_panel.size = (selector_start_pos - mouse_pos).abs()
@@ -677,13 +667,40 @@ func reshape_selector_cursor_panel() -> void:
 	else:
 		cursor_node.position.y = mouse_pos.y
 
+func set_cursor_visibility() -> void:
+	# figures out whether the cursor should be visible or not
+	var should_be_visible := true
+	if hovering_over_menu or hovering_over_sidebar or player_camera_has_mouse:
+		should_be_visible = true
+	else:
+		if current_tool == tool.POINTER:
+			should_be_visible = false
+
+	if should_be_visible:
+		Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+	else:
+		Input.set_mouse_mode(Input.MOUSE_MODE_HIDDEN)
+
+func set_cursor_node_visibility() -> void:
+	# figures out whether the cursor should be visible or not
+	var should_be_visible := true
+
+	if hovering_over_menu:
+		should_be_visible = false
+
+	if current_tool == tool.SELECTOR and not selecting:
+		should_be_visible = false
+
+	if current_tool == tool.TOKEN_PLACER and not hovered_tokens.is_empty() and not m1_held:
+		should_be_visible = false
+
+	cursor_node.visible = should_be_visible
+
 
 func update_tool_visuals() -> void:
 	# make all buttons unpressed
 	for i in range(len(button_list)):
 		button_list[i][0].add_theme_stylebox_override("normal", stylebox_button_not_pressed)
-
-	cursor_node.visible = true
 
 	tool_label.text = button_list[current_tool][1]
 
@@ -695,16 +712,13 @@ func update_tool_visuals() -> void:
 	color_picker_container.visible = current_tool == tool.TOKEN_PLACER
 	scroll_sidebar.visible = (current_tool != tool.SELECTOR) and (current_tool != tool.POINTER)
 	player_pointer.visible = current_tool == tool.POINTER
-	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE if current_tool != tool.POINTER else Input.MOUSE_MODE_HIDDEN)
 
 	match current_tool:
 		tool.SQUARE_BRUSH:
-			set_cursor_shape(CursorShape.CURSOR_CROSS)
 			cursor_panel.add_theme_stylebox_override("panel", stylebox_cursor_normal)
-
 			square_brush_button.add_theme_stylebox_override("normal", stylebox_button_pressed)
+
 		tool.ROUND_BRUSH:
-			set_cursor_shape(CursorShape.CURSOR_CROSS)
 			var stylebox_cursor := make_circular_stylebox()
 			stylebox_cursor.bg_color = Color.TRANSPARENT
 			stylebox_cursor.border_color = Color.BLACK
@@ -712,14 +726,11 @@ func update_tool_visuals() -> void:
 
 			round_brush_button.add_theme_stylebox_override("normal", stylebox_button_pressed)
 		tool.SELECTOR:
-			set_cursor_shape()
 			cursor_panel.add_theme_stylebox_override("panel", stylebox_cursor_normal)
 
 			selector_button.add_theme_stylebox_override("normal", stylebox_button_pressed)
 			reshape_selector_cursor_panel()
 		tool.TOKEN_PLACER:
-			set_cursor_shape()
-
 			scrollbar.set_value_no_signal(last_token_size)
 			brush_size = last_token_size
 			scrollbar_label.text = str(int(brush_size))
@@ -914,8 +925,6 @@ func load_map(path: String) -> void:
 		dm_background.texture = image_texture
 		player_background.texture = image_texture
 
-		player_view.visible = true
-		player_view_text.visible = true
 		current_file_path = path
 
 		dm_fog.material.set_shader_parameter("alpha_ceil", 0.5)
@@ -936,7 +945,10 @@ func load_map(path: String) -> void:
 
 	offset_background(player_root)
 	offset_background(dm_root)
-	move_player_view()
+
+	player_view.visible = true
+	player_view_text.visible = true
+	align_player_view()
 
 	drawing_texture.visible = true
 	pretend_to_draw.emit()
@@ -1054,10 +1066,12 @@ func debug() -> void:
 	text += "held_tokens: %s\n" % held_tokens
 	text += "hovered_tokens: %s\n" % hovered_tokens
 	text += "cursor_node.visible: %s\n" % cursor_node.visible
+	text += "player_camera_has_mouse: %s\n" % player_camera_has_mouse
+	text += "input_calls: %s\n" % input_calls
+	text += "mouse_default_cursor_shape: %s\n" % mouse_default_cursor_shape
+	text += "player_view.position: %s\n" % player_view.position
 
-	for i in range(len(undo_list)):
-		text += str(undo_list[i]) + "\n"
-
+	debug_text.visible = true
 	debug_text.text = text
 
 
